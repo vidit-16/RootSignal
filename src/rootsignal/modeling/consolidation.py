@@ -112,24 +112,18 @@ def build_commercial_mart(
     sales = enrich_sales(tables)
     orders = enrich_orders(tables)
 
-    _require_columns(sales, [*grain_columns, "order_id", "units", "unit_price", "net_sales"], "fact_sales")
+    _require_columns(
+        sales,
+        [*grain_columns, "order_id", "units", "unit_price", "net_sales"],
+        "fact_sales",
+    )
     _require_columns(
         orders,
         [*grain_columns, "order_id", "ordered_units", "fulfilled_units", "cancelled_units"],
         "fact_orders",
     )
 
-    sales_agg = (
-        sales.groupby(grain_columns, dropna=False, as_index=False)
-        .agg(
-            gross_sales=("unit_price", lambda values: 0.0),
-            net_sales=("net_sales", "sum"),
-            sales_units=("units", "sum"),
-            sales_order_count=("order_id", "nunique"),
-        )
-    )
-    gross = sales["units"] * sales["unit_price"]
-    sales_with_gross = sales.assign(gross_sales=gross)
+    sales_with_gross = sales.assign(gross_sales=sales["units"] * sales["unit_price"])
     sales_agg = (
         sales_with_gross.groupby(grain_columns, dropna=False, as_index=False)
         .agg(
