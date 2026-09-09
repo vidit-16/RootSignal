@@ -44,14 +44,19 @@ def test_validator_accepts_clean_transaction_set(tmp_path: Path) -> None:
 
     sales = tables["fact_sales"].drop_duplicates().copy()
     sales["discount_pct"] = sales["discount_pct"].fillna(0.0)
-    sales["unit_price"] = sales["unit_price"].fillna(sales["unit_price"].median())
+    sku_prices = tables["dim_sku"].set_index("sku_id")["list_price"]
+    sales["unit_price"] = sales["unit_price"].fillna(sales["sku_id"].map(sku_prices))
+    sales["net_sales"] = (
+        sales["units"] * sales["unit_price"] * (1 - sales["discount_pct"])
+    ).round(2)
     tables["fact_sales"] = sales
 
     orders = tables["fact_orders"].copy()
     bad = orders["fulfilled_units"] > orders["ordered_units"]
     orders.loc[bad, "fulfilled_units"] = orders.loc[bad, "ordered_units"]
     orders["cancelled_units"] = orders["ordered_units"] - orders["fulfilled_units"]
-    orders["channel"] = orders["channel"].fillna("D2C")
+    customer_channels = tables["dim_customer"].set_index("customer_id")["channel"]
+    orders["channel"] = orders["channel"].fillna(orders["customer_id"].map(customer_channels))
     tables["fact_orders"] = orders
 
     report = DatasetValidator().validate(tables)
