@@ -48,7 +48,7 @@ def enrich_sales(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
         sales,
         tables["dim_sku"],
         "sku_id",
-        ["sku_name", "category", "sub_category", "pack_size_kg", "unit_cost", "list_price"],
+        ["sku_name", "sub_category", "pack_size_kg", "unit_cost", "list_price"],
         "dim_sku",
     )
     sales = _left_enrich(
