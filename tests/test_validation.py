@@ -4,7 +4,6 @@ from pathlib import Path
 from rootsignal.ingestion import load_dataset
 from rootsignal.validation import DatasetValidator
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
