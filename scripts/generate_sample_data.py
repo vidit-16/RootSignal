@@ -158,7 +158,7 @@ def build_transactions(
 
             status = "Cancelled" if rng.random() < 0.025 else "Completed"
             fulfilled_units = (
-                max(0, int(round(ordered_units * fulfillment_ratio)))
+                max(0, round(ordered_units * fulfillment_ratio))
                 if status != "Cancelled"
                 else 0
             )
