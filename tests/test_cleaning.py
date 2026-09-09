@@ -4,7 +4,6 @@ from pathlib import Path
 from rootsignal.cleaning import clean_dataset
 from rootsignal.ingestion import load_dataset
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
