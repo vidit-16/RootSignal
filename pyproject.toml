@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rootsignal"
+version = "0.1.0"
+description = "Evidence-backed analytics for sales, supply, and business performance."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26,<3",
+    "pandas>=2.1,<3",
+    "openpyxl>=3.1,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "ruff>=0.6,<1",
+]
+
+dashboard = [
+    "streamlit>=1.36,<2",
+    "plotly>=5.24,<7",
+]
+
+forecasting = [
+    "statsmodels>=0.14,<1",
+    "scikit-learn>=1.5,<2",
+]
+
+ai = [
+    "openai>=1.50,<2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.setuptools.packages.find]
+where = ["src"]
