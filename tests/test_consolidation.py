@@ -123,7 +123,7 @@ def test_commercial_mart_does_not_multiply_multi_sku_orders() -> None:
     assert row["fulfilled_units"] == 5
     assert row["cancelled_units"] == 2
     assert row["fill_rate"] == 0.7143
-    assert row["cancellation_rate"] == 2 / 7
+    assert row["cancellation_rate"] == 0.2857
     assert row["aov"] == 560.0
 
 
