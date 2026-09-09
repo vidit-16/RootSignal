@@ -9,14 +9,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def make_dataset(tmp_path: Path):
     subprocess.run(
-        ["python", str(ROOT / "scripts" / "generate_sample_data.py"), "--output-dir", str(tmp_path)],
+        [
+            "python",
+            str(ROOT / "scripts" / "generate_sample_data.py"),
+            "--output-dir",
+            str(tmp_path),
+        ],
         check=True,
         cwd=ROOT,
     )
     return load_dataset(tmp_path)
 
 
-def test_cleaning_removes_recoverable_defects_and_quarantines_invalid_orders(tmp_path: Path) -> None:
+def test_cleaning_removes_recoverable_defects_and_quarantines_invalid_orders(
+    tmp_path: Path,
+) -> None:
     tables = make_dataset(tmp_path)
     result = clean_dataset(tables)
 
@@ -34,5 +41,17 @@ def test_cleaned_orders_reconcile(tmp_path: Path) -> None:
     result = clean_dataset(make_dataset(tmp_path))
     orders = result.tables["fact_orders"]
     assert (orders["fulfilled_units"] <= orders["ordered_units"]).all()
-    assert (orders["fulfilled_units"] + orders["cancelled_units"] == orders["ordered_units"]).all()
-\n\ndef test_cleaned_sales_reconcile(tmp_path: Path) -> None:\n    result = clean_dataset(make_dataset(tmp_path))\n    sales = result.tables["fact_sales"]\n    expected = (\n        sales["units"] * sales["unit_price"] * (1 - sales["discount_pct"])\n    ).round(2)\n    assert sales["net_sales"].equals(expected)\n
+    assert (
+        orders["fulfilled_units"] + orders["cancelled_units"]
+        == orders["ordered_units"]
+    ).all()
+
+
+def test_cleaned_sales_reconcile(tmp_path: Path) -> None:
+    result = clean_dataset(make_dataset(tmp_path))
+    sales = result.tables["fact_sales"]
+    expected = (
+        sales["units"] * sales["unit_price"] * (1 - sales["discount_pct"])
+    ).round(2)
+
+    assert sales["net_sales"].equals(expected)
