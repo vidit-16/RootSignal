@@ -1,7 +1,5 @@
-from pathlib import Path
 import subprocess
-
-import pandas as pd
+from pathlib import Path
 
 from rootsignal.ingestion import load_dataset
 from rootsignal.validation import DatasetValidator
