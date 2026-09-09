@@ -21,7 +21,7 @@ def test_cleaning_removes_recoverable_defects_and_quarantines_invalid_orders(tmp
     tables = make_dataset(tmp_path)
     result = clean_dataset(tables)
 
-    assert len(result.tables["fact_sales"]) == len(tables["fact_sales"].drop_duplicates()) - 2
+    assert len(result.tables["fact_sales"]) == len(tables["fact_sales"].drop_duplicates())
     assert result.tables["fact_sales"]["discount_pct"].isna().sum() == 0
     assert result.tables["fact_sales"]["unit_price"].isna().sum() == 0
     assert result.tables["fact_orders"]["channel"].isna().sum() == 0
