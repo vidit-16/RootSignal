@@ -52,4 +52,4 @@ Power BI is intentionally outside the core project scope.
 
 ## Status
 
-The project is being built incrementally. The repository now contains the business data model and SQL schema; the next stage will add the controlled sample dataset and ingestion/validation pipeline.
+The repository now contains the data model, SQL schema, reproducible sample-data generator, ingestion and validation layers, cleaning/quarantine pipeline, and deterministic KPI engine. The next stage will add forecasting and forecast evaluation on top of these verified analytical outputs.
