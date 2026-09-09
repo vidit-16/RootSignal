@@ -28,13 +28,13 @@ TABLE_CONTRACTS: dict[str, TableContract] = {
     ),
     "fact_sales": TableContract(
         ("order_id", "date", "customer_id", "region_code", "channel", "kam_id", "sku_id", "category", "sales_type", "units", "unit_price", "discount_pct", "net_sales"),
-        ("order_id",),
+        ("order_id", "sku_id", "sales_type"),
         ("units", "unit_price", "net_sales"),
         {"discount_pct": (0.0, 1.0)},
     ),
     "fact_orders": TableContract(
         ("order_id", "date", "customer_id", "region_code", "channel", "sku_id", "ordered_units", "fulfilled_units", "cancelled_units", "order_status", "sales_type"),
-        ("order_id",),
+        ("order_id", "sku_id", "sales_type"),
         ("ordered_units", "fulfilled_units", "cancelled_units"),
     ),
     "fact_inventory": TableContract(
