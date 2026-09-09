@@ -32,6 +32,12 @@ def _left_enrich(
     _require_columns(fact, [key], "fact")
     _require_columns(dimension, [key, *columns], name)
 
+    collisions = sorted(set(columns) & set(fact.columns))
+    if collisions:
+        raise ValueError(
+            f"{name} enrichment would collide with existing fact columns: {collisions}."
+        )
+
     lookup = dimension[[key, *columns]].copy()
     result = fact.merge(lookup, on=key, how="left", validate="many_to_one")
     if len(result) != len(fact):
@@ -59,7 +65,13 @@ def enrich_sales(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
         "dim_customer",
     )
     sales = _left_enrich(sales, tables["dim_kam"], "kam_id", ["kam_name"], "dim_kam")
-    sales = _left_enrich(sales, tables["dim_region"], "region_code", ["city", "zone"], "dim_region")
+    sales = _left_enrich(
+        sales,
+        tables["dim_region"],
+        "region_code",
+        ["city", "zone"],
+        "dim_region",
+    )
 
     if len(sales) != original_rows:
         raise ValueError("Sales enrichment changed row count.")
@@ -85,7 +97,13 @@ def enrich_orders(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
         ["customer_name", "customer_type"],
         "dim_customer",
     )
-    orders = _left_enrich(orders, tables["dim_region"], "region_code", ["city", "zone"], "dim_region")
+    orders = _left_enrich(
+        orders,
+        tables["dim_region"],
+        "region_code",
+        ["city", "zone"],
+        "dim_region",
+    )
 
     if len(orders) != original_rows:
         raise ValueError("Order enrichment changed row count.")
@@ -119,7 +137,13 @@ def build_commercial_mart(
     )
     _require_columns(
         orders,
-        [*grain_columns, "order_id", "ordered_units", "fulfilled_units", "cancelled_units"],
+        [
+            *grain_columns,
+            "order_id",
+            "ordered_units",
+            "fulfilled_units",
+            "cancelled_units",
+        ],
         "fact_orders",
     )
 
