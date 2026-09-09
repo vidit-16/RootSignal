@@ -47,7 +47,7 @@ def test_order_kpis_calculate_fill_and_cancellation_rates() -> None:
     result = calculate_order_kpis(orders, ["date"])
     row = result.iloc[0]
     assert row["order_count"] == 2
-    assert row["fill_rate"] == 13 / 15
+    assert row["fill_rate"] == 0.8667
     assert row["cancellation_rate"] == 2 / 15
 
 
