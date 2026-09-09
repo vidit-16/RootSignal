@@ -3,7 +3,6 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
-
 DEFAULT_SALES_GROUPS = ["date"]
 DEFAULT_ORDER_GROUPS = ["date"]
 
