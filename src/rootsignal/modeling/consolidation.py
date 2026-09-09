@@ -1,14 +1,10 @@
-from __future__ import annotations
-
-from collections.abc import Sequence
-
 import pandas as pd
 
 
 DEFAULT_COMMERCIAL_GRAIN = ["date", "region_code", "category", "channel", "sales_type"]
 
 
-def _require_columns(frame: pd.DataFrame, columns: Sequence[str], name: str) -> None:
+def _require_columns(frame: pd.DataFrame, columns: list[str], name: str) -> None:
     missing = [column for column in columns if column not in frame.columns]
     if missing:
         raise ValueError(f"{name} is missing required columns: {missing}")
@@ -25,7 +21,7 @@ def _left_enrich(
     fact: pd.DataFrame,
     dimension: pd.DataFrame,
     key: str,
-    columns: Sequence[str],
+    columns: list[str],
     name: str,
 ) -> pd.DataFrame:
     _require_unique_dimension(dimension, key, name)
@@ -112,7 +108,7 @@ def enrich_orders(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 def build_commercial_mart(
     tables: dict[str, pd.DataFrame],
-    grain: Sequence[str] | None = None,
+    grain: list[str] | None = None,
 ) -> pd.DataFrame:
     """Build a fact-safe commercial mart from separately aggregated facts.
 
