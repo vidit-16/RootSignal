@@ -35,3 +35,4 @@ def test_cleaned_orders_reconcile(tmp_path: Path) -> None:
     orders = result.tables["fact_orders"]
     assert (orders["fulfilled_units"] <= orders["ordered_units"]).all()
     assert (orders["fulfilled_units"] + orders["cancelled_units"] == orders["ordered_units"]).all()
+\n\ndef test_cleaned_sales_reconcile(tmp_path: Path) -> None:\n    result = clean_dataset(make_dataset(tmp_path))\n    sales = result.tables["fact_sales"]\n    expected = (\n        sales["units"] * sales["unit_price"] * (1 - sales["discount_pct"])\n    ).round(2)\n    assert sales["net_sales"].equals(expected)\n
