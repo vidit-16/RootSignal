@@ -1,5 +1,5 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 from rootsignal.cleaning import clean_dataset
 from rootsignal.ingestion import load_dataset
