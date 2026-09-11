@@ -263,7 +263,132 @@ def test_service_status_always_returns_a_label_with_its_colour() -> None:
         assert label and colour.startswith("#")
 
 
-def test_axis_labels_do_not_show_column_names() -> None:
+def test_axis_labels_come_from_the_shared_map() -> None:
+    """A chart axis, a table header and a report column must agree on names."""
     charts = chart_module()
-    assert charts.prettify("net_sales") == "Net sales"
-    assert charts.prettify("period_start") == "Period start"
+    from rootsignal.presentation import label_for
+
+    for column in ("net_sales", "region_code", "kam_id", "fill_rate"):
+        assert charts.prettify(column) == label_for(column)
+    assert charts.prettify("region_code") == "Region"  # not "Region code"
+
+
+# --------------------------------------------------------------------------
+# Reader-facing language
+# --------------------------------------------------------------------------
+
+
+def test_identifier_codes_become_the_names_the_data_already_holds(cleaned_dataset) -> None:
+    """A tool built for account managers should be able to name them.
+
+    The customer master carries the names; nothing but habit keeps K001 on the
+    screen.
+    """
+    from rootsignal.presentation import build_name_lookup
+
+    tables = cleaned_dataset.tables
+    lookup = build_name_lookup(tables)
+
+    assert lookup["K001"] == "Aarav Mehta"
+    assert lookup["BLR"] == "Bengaluru"
+    assert lookup["DEL"] == "Delhi NCR"
+
+
+def test_composite_segments_are_rendered_in_names(cleaned_dataset) -> None:
+    from rootsignal.presentation import build_name_lookup, humanise_segment
+
+    lookup = build_name_lookup(cleaned_dataset.tables)
+    assert humanise_segment("BLR | Vegetables", lookup) == "Bengaluru · Vegetables"
+
+
+def test_unknown_codes_are_left_visible_rather_than_blanked() -> None:
+    """A missing lookup should be obvious, not silently erase a row's identity."""
+    from rootsignal.presentation import humanise_segment
+
+    assert humanise_segment("ZZZ | Fruits", {"BLR": "Bengaluru"}) == "ZZZ · Fruits"
+
+
+def test_internal_tokens_are_unchanged_by_the_display_layer(cleaned_dataset) -> None:
+    """Translation happens on the way out only.
+
+    Downstream code and tests depend on a stable pattern token, so the label a
+    reader sees must not replace the value the system reasons about.
+    """
+    from rootsignal.presentation import describe_pattern
+
+    views = signal_views(
+        cleaned_dataset.tables, current_period="2026-02-23", comparison_period="2026-02-09"
+    )
+    signal = views["signals"][0]
+
+    assert signal.pattern.pattern in {
+        "fulfilment_constraint", "demand_softness", "portfolio_mix_shift", "unclassified"
+    }
+    assert describe_pattern(signal.pattern.pattern) != signal.pattern.pattern
+
+
+def test_generated_prose_shows_places_rather_than_codes(cleaned_dataset) -> None:
+    """The signal layer builds statements around the segment key; readers see names."""
+    from rootsignal.presentation import build_name_lookup, humanise_statement
+
+    lookup = build_name_lookup(cleaned_dataset.tables)
+    text = "Review inventory availability for BLR | Fruits, starting with the SKUs."
+    rendered = humanise_statement(text, "BLR | Fruits", lookup)
+
+    assert "BLR" not in rendered
+    assert "Bengaluru · Fruits" in rendered
+
+
+def test_every_displayed_label_avoids_raw_schema_names(cleaned_dataset) -> None:
+    """No underscore-separated key should reach a reader."""
+    from rootsignal.presentation import build_name_lookup, for_display
+
+    tables = cleaned_dataset.tables
+    views = sales_views(tables, period="week")
+    displayed = for_display(views["by_region"], lookup=build_name_lookup(tables))
+
+    for column in displayed.columns:
+        assert "_" not in column, column
+
+
+def test_measure_names_are_translated_as_values_too(cleaned_dataset) -> None:
+    """Some columns hold measure names as values, and they need the same map."""
+    from rootsignal.presentation import for_display
+
+    views = signal_views(
+        cleaned_dataset.tables, current_period="2026-02-23", comparison_period="2026-02-09"
+    )
+    displayed = for_display(views["evidence"])
+
+    measures = set(displayed["Measure"])
+    assert "ordered_units" not in measures
+    assert "Units ordered" in measures
+
+
+def test_every_confidence_criterion_has_a_plain_label() -> None:
+    """A criterion called movement_stands_out explains nothing to a reader."""
+    from rootsignal.signals.confidence import assess_confidence
+    from rootsignal.presentation import CRITERION_LABELS, describe_criterion
+
+    assessment = assess_confidence(-0.2, 0.05, 3, 0.4, 4, False, 0.65)
+    for criterion in assessment.criteria:
+        assert criterion.name in CRITERION_LABELS, criterion.name
+        assert describe_criterion(criterion.name) != criterion.name
+
+
+def test_every_forecasting_method_has_a_sayable_name() -> None:
+    from rootsignal.forecasting import default_model_suite
+    from rootsignal.presentation import MODEL_LABELS, describe_model
+
+    for model in default_model_suite():
+        assert model.name in MODEL_LABELS, model.name
+        assert describe_model(model.name) != model.name
+
+
+def test_jargon_carries_a_plain_definition() -> None:
+    """Terms a reader may not have met are explained rather than assumed."""
+    from rootsignal.presentation import GLOSSARY, glossary_for, label_for
+
+    for column in ("fill_rate", "wape", "impact", "confidence", "primary_sales"):
+        assert label_for(column) in GLOSSARY, column
+    assert glossary_for(["Fill rate"])["Fill rate"]

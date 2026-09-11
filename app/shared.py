@@ -27,8 +27,15 @@ from rootsignal.dashboard import (  # noqa: E402
     signal_views,
     supply_views,
 )
+from rootsignal.presentation import (  # noqa: E402
+    GLOSSARY,
+    build_name_lookup,
+    for_display,
+    glossary_for,
+)
 
 PERIODS = ("day", "week", "month")
+PERIOD_WORDS = {"day": "day", "week": "week", "month": "month"}
 
 
 @st.cache_data(show_spinner="Loading and cleaning the dataset...")
@@ -132,3 +139,38 @@ def metric_row(headline: dict, keys: list[tuple[str, str, str]]) -> None:
 
 def caveat(text: str) -> None:
     st.caption(f":grey[{text}]")
+
+
+@st.cache_data(show_spinner=False)
+def get_names(input_dir: str) -> dict:
+    """Code-to-name lookup, so the screen shows people and places, not keys."""
+    return build_name_lookup(get_data(input_dir)["tables"])
+
+
+def show_table(frame, input_dir: str, drop: tuple = (), **kwargs) -> None:
+    """Render a frame in reader-facing language.
+
+    Translation happens here, at the edge. Nothing upstream renames anything.
+    """
+    st.dataframe(
+        for_display(frame, lookup=get_names(input_dir), drop=drop),
+        hide_index=True,
+        use_container_width=True,
+        **kwargs,
+    )
+
+
+def glossary(labels: list[str]) -> None:
+    """Explain the terms on this page rather than assuming them."""
+    entries = glossary_for(labels)
+    if not entries:
+        return
+    with st.expander("What these terms mean"):
+        for term, meaning in entries.items():
+            st.markdown(f"**{term}** — {meaning}")
+
+
+def full_glossary() -> None:
+    with st.expander("Glossary"):
+        for term, meaning in GLOSSARY.items():
+            st.markdown(f"**{term}** — {meaning}")

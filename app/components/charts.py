@@ -18,6 +18,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from rootsignal.presentation import label_for
+
 # Categorical slots in fixed order. Validated as a set on the adjacent pairlist;
 # used unchanged rather than re-stepped.
 CATEGORICAL = (
@@ -45,12 +47,12 @@ MAX_SERIES = 8
 
 
 def prettify(name: str) -> str:
-    """Turn a column name into a readable axis label.
+    """The readable label for an axis.
 
-    A business dashboard that labels an axis `net_sales` is showing its
-    plumbing. Readers should not have to know the schema to read a chart.
+    Delegates to the shared label map so a chart axis, a table header and a
+    report column never disagree about what something is called.
     """
-    return str(name).replace("_", " ").strip().capitalize()
+    return label_for(name)
 
 
 def _axis_labels(*columns: str) -> dict[str, str]:

@@ -31,6 +31,34 @@ engine. A dashboard that re-derived fill rate from whatever columns were to hand
 would become a second definition of it — the failure the SQL parity test exists
 to prevent.
 
+## The words on the screen
+
+Internal names do not reach a reader. `rootsignal.presentation` holds one map
+from schema keys to language a business reader already has:
+
+| Internal | Shown |
+| --- | --- |
+| `K001` | Aarav Mehta |
+| `BLR \| Vegetables` | Bengaluru · Vegetables |
+| `fulfilment_constraint` | Supply could not keep up |
+| `movement_stands_out` | Bigger than this segment's usual swing |
+| `sales_order_count` | Orders with sales |
+| `seasonal_mean_7` | Same weekday average |
+
+This is not cosmetic. A tool built for key account managers that shows `K001`
+when the customer master holds "Aarav Mehta" is asking its reader to know the
+schema. The analysis is only useful if the person who has to act on it can read
+it.
+
+**Translation happens on the way out only.** `signal.pattern.pattern` is still
+`fulfilment_constraint`, because downstream code and tests depend on a stable
+token; only what reaches a human changes. A test asserts both halves of that.
+
+The same map backs chart axes, table headers and the generated prose, so an axis
+label, a column header and a report never disagree about what something is
+called. Terms a reader may not have met — fill rate, WAPE, sell-in — carry plain
+definitions in an expandable glossary rather than being assumed.
+
 ## Charts
 
 Colour is assigned by the job it does, from a validated categorical palette used

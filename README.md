@@ -72,6 +72,7 @@ Power BI is intentionally outside the core project scope.
 | SQL layer | Staging views, commercial mart and seven business queries, all executed by tests | [sql.md](docs/sql.md) |
 | Excel reporting | Six operational workbooks, each opening with what its figures mean | [reporting.md](docs/reporting.md) |
 | Dashboard | Five Streamlit pages over a Streamlit-free, tested data layer | [dashboard.md](docs/dashboard.md) |
+| Presentation | One map from schema keys to language a business reader already has | [dashboard.md](docs/dashboard.md#the-words-on-the-screen) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
@@ -108,7 +109,7 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
 - **Variance coverage:** plan-versus-actual attainment spans **82.1% to 115.6%**
   across 64 region/category/channel segments (27 above plan, 37 below). KAM quota
   attainment runs 93.0% to 110.0% across the four key account managers.
-- **Tests:** 201 automated tests covering validation, cleaning, KPIs, consolidation,
+- **Tests:** 211 automated tests covering validation, cleaning, KPIs, consolidation,
   SQL schema conformance and parity, forecasting, trend and variance analysis,
   driver decomposition, impact estimation, signal assembly, scenario evaluation,
   Excel reporting, and the dashboard data layer. One asserts that no signal output

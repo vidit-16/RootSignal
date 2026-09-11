@@ -1,82 +1,99 @@
-"""Supply: fulfilment, stock, and where demand is going unserved."""
+"""Supply: where deliveries are slipping, and what it is costing."""
 
 from __future__ import annotations
 
 import streamlit as st
 
-from components.charts import STATUS, comparison_bars, trend_line, variance_bars
-from shared import caveat, configure, get_supply, sidebar
+from components.charts import comparison_bars, trend_line, variance_bars
+from rootsignal.presentation import humanise_identifiers, humanise_segment, label_for
+from shared import caveat, configure, get_names, get_supply, glossary, show_table, sidebar
 
 configure("Supply")
 input_dir, period = sidebar()
 views = get_supply(input_dir, period)
+names = get_names(input_dir)
 
-st.title("Supply and fulfilment")
+st.title("Supply and delivery")
+st.caption("Are we delivering what customers ordered — and if not, where is it going wrong?")
 
 service = views["service"]
 latest = service[service["period_start"] == service["period_start"].max()]
 below = latest[latest["variance"] < 0]
+unfulfilled = int((views["segments"]["ordered_units"] - views["segments"]["fulfilled_units"]).sum())
 
 left, right, third = st.columns(3)
-left.metric("Segments below service target", f"{len(below)} of {len(latest)}")
+left.metric("Segments missing the delivery target", f"{len(below)} of {len(latest)}")
 right.metric(
-    "Worst gap to target",
+    "Worst shortfall against target",
     f"{below['variance'].min():.1%}" if len(below) else "none",
 )
-third.metric(
-    "Unfulfilled units in period",
-    f"{int((views['segments']['ordered_units'] - views['segments']['fulfilled_units']).sum()):,}",
+third.metric("Units ordered but not delivered", f"{unfulfilled:,}")
+caveat(
+    "A segment nobody ordered from has no fill rate, and is not counted as a miss. "
+    f"Figures cover the complete {period}s in the dataset."
 )
-caveat("A period with no demand has no fill rate and is not counted as a miss.")
 
 st.divider()
-st.subheader("Fill rate against the service target")
+st.subheader("Share of orders actually delivered")
 st.plotly_chart(
-    trend_line(views["by_region"], "period_start", "fill_rate", series="region_code", title="By region"),
-    use_container_width=True,
-)
-st.plotly_chart(
-    variance_bars(
-        latest.nsmallest(12, "variance"), "segment", "variance",
-        title=f"Gap to target, {latest['period_start'].max().date()}",
+    trend_line(
+        humanise_identifiers(views["by_region"], names),
+        "period_start", "fill_rate", series="region_code", title="By region",
     ),
     use_container_width=True,
 )
+caveat("1.00 means every unit ordered was delivered. The service target is 0.93.")
+
+gap = latest.copy()
+gap["segment"] = gap["segment"].map(lambda s: humanise_segment(s, names))
+st.plotly_chart(
+    variance_bars(
+        gap.nsmallest(12, "variance"), "segment", "variance",
+        title=f"Distance from the delivery target, {latest['period_start'].max().date()}",
+    ),
+    use_container_width=True,
+)
+caveat("Red is below target, green above. A bar of -0.20 means twenty points below the target rate.")
 
 st.divider()
-st.subheader("Stock and stockouts")
-inventory = views["inventory_by_region"]
+st.subheader("Stock on hand")
+inventory = humanise_identifiers(views["inventory_by_region"], names)
 left, right = st.columns(2)
 with left:
     st.plotly_chart(
-        trend_line(inventory, "period_start", "available_stock", series="region_code", title="Average available stock"),
+        trend_line(inventory, "period_start", "available_stock", series="region_code",
+                   title="Average stock available"),
         use_container_width=True,
     )
 with right:
     st.plotly_chart(
-        trend_line(inventory, "period_start", "stockout_rate", series="region_code", title="Stockout rate"),
+        trend_line(inventory, "period_start", "stockout_rate", series="region_code",
+                   title="How often products ran out"),
         use_container_width=True,
     )
 caveat(
-    "Stock is a level and is averaged across the period; receipts and movements are "
-    "flows and are summed. Summing a level would report a week's stock as seven times its size."
+    "Stock is a level, so it is averaged over the period; deliveries into the warehouse are "
+    "a flow, so they are added up. Adding stock up across days would report a week's stock "
+    "as seven times its real size."
 )
 
 st.divider()
-st.subheader("SKUs carrying the unfulfilled demand")
+st.subheader("Products with the most unserved demand")
 by_sku = views["by_sku"]
 worst = by_sku.groupby(["sku_id", "sku_name", "category"], as_index=False)[
     ["ordered_units", "fulfilled_units", "unfulfilled_units"]
 ].sum()
 worst["fill_rate"] = (worst["fulfilled_units"] / worst["ordered_units"]).round(4)
 worst = worst.nlargest(15, "unfulfilled_units")
+
 st.plotly_chart(
-    comparison_bars(worst, "sku_name", "unfulfilled_units", title="Unfulfilled units by SKU"),
+    comparison_bars(worst, "sku_name", "unfulfilled_units", title="Units ordered but not delivered"),
     use_container_width=True,
 )
-st.dataframe(worst, hide_index=True, use_container_width=True)
+show_table(worst, input_dir, drop=("sku_id",))
 caveat(
-    f"Ranked by volume of unserved demand, not by fill rate: a low rate on a tiny SKU "
-    f"matters less than a modest one on a large SKU. Status colours here are reserved "
-    f"({', '.join(STATUS)}) and always carry a label."
+    "Ranked by how many units went unserved, not by delivery rate. A poor rate on a product "
+    "nobody orders matters less than a modest one on a product everybody does."
 )
+
+glossary([label_for(c) for c in ("fill_rate", "stockout_rate", "unfulfilled_units")])

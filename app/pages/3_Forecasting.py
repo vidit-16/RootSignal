@@ -1,73 +1,84 @@
-"""Forecasting: how accurate the expected baseline is, and on what evidence."""
+"""Forecasting: how close the expected baseline gets, and on what evidence."""
 
 from __future__ import annotations
 
 import streamlit as st
 
 from components.charts import actual_versus_expected, comparison_bars, trend_line
-from shared import caveat, configure, get_forecasts, sidebar
+from rootsignal.presentation import describe_model, label_for
+from shared import caveat, configure, get_forecasts, glossary, show_table, sidebar
 
 configure("Forecasting")
 input_dir, _ = sidebar(show_period=False)
 views = get_forecasts(input_dir)
 settings = views["settings"]
 
+METRIC_NAMES = {"net_sales": "Net sales", "units": "Units sold", "orders": "Orders"}
+
 st.title("Forecasting")
-st.markdown(
-    "The forecast supplies the expected baseline that variance analysis compares "
-    "against. It is an input to evidence, not a prediction product in its own right."
+st.caption(
+    "A forecast gives us a number to compare against. Without one we cannot tell an "
+    "ordinary quiet week from a week that genuinely went wrong."
 )
 
-metric = st.selectbox("Metric", list(views["accuracy"]), index=0)
+metric = st.selectbox(
+    "What to forecast",
+    list(views["accuracy"]),
+    index=0,
+    format_func=lambda m: METRIC_NAMES.get(m, m),
+)
 accuracy = views["accuracy"][metric]
 backtest = views["backtests"][metric]
 best = accuracy.iloc[0]
 
 left, right, third = st.columns(3)
-left.metric("Best model", best["model"])
-right.metric("WAPE", f"{best['wape']:.4f}")
+left.metric("Best method", describe_model(best["model"]))
+right.metric("Typical error", f"{best['wape']:.1%}")
 third.metric(
-    "Against naive baseline",
-    f"{best['wape_improvement_vs_baseline']:+.1%}" if best["model"] != "naive" else "baseline",
+    "Better than repeating yesterday",
+    f"{best['wape_improvement_vs_baseline']:+.1%}"
+    if best["model"] != "naive"
+    else "this is the baseline",
 )
 caveat(
-    f"Rolling-origin backtest: horizon {settings['horizon']} days, "
-    f"initial training window {settings['initial_train']} days, step {settings['step']}. "
-    f"Each model is refitted at every origin on data strictly before the window it is scored on."
+    f"Tested by forecasting {settings['horizon']} days ahead from "
+    f"{backtest['fold'].nunique()} different starting points, each time using only data from "
+    f"before the days being predicted. Nothing here is scored on data the method had seen."
 )
 
 st.divider()
-st.subheader("Model comparison")
+st.subheader("How the methods compare")
+labelled = accuracy.copy()
+labelled["model"] = labelled["model"].map(describe_model)
 st.plotly_chart(
-    comparison_bars(accuracy, "model", "wape", title="WAPE, lower is better"),
+    comparison_bars(labelled, "model", "wape", title="Typical error, shorter is better"),
     use_container_width=True,
 )
-st.dataframe(
-    accuracy[["model", "folds", "n_observations", "mae", "rmse", "wape", "mape", "bias"]],
-    hide_index=True,
-    use_container_width=True,
+show_table(
+    accuracy[
+        ["model", "folds", "n_observations", "mae", "rmse", "wape", "bias", "wape_improvement_vs_baseline"]
+    ],
+    input_dir,
 )
 caveat(
-    "MAPE is blank where a near-zero actual would make it meaningless. WAPE is the "
-    "metric to read. A model below the baseline is reported as such rather than hidden."
+    "A method that scores worse than the baseline is shown as such rather than hidden. "
+    "Repeating last week performs badly here, and that is a finding rather than a fault."
 )
 
 st.divider()
-st.subheader(f"Actual against forecast — {best['model']}")
+st.subheader(f"What happened, against what {describe_model(best['model']).lower()} predicted")
+st.plotly_chart(actual_versus_expected(backtest, "date", "actual", "forecast"), use_container_width=True)
 st.plotly_chart(
-    actual_versus_expected(backtest, "date", "actual", "forecast", title=""),
-    use_container_width=True,
-)
-st.plotly_chart(
-    trend_line(backtest, "date", "error", title="Forecast error (forecast minus actual)"),
+    trend_line(backtest, "date", "error", title="How far off it was (above zero means it predicted too high)"),
     use_container_width=True,
 )
 caveat(
-    "These are out-of-sample values from the backtest folds, not an in-sample fit. "
-    "Accuracy is measured at a daily company-wide grain; segment-level forecasts have "
-    "not been evaluated and should not be assumed to reach the same accuracy."
+    "These are predictions for days the method had not seen. Accuracy is measured for the "
+    "business as a whole, one day at a time. Forecasts for individual regions or categories "
+    "have not been tested and should not be assumed to be this good."
 )
 
-st.divider()
-with st.expander("The daily series being forecast"):
-    st.dataframe(views["series"].reset_index(), hide_index=True, use_container_width=True)
+with st.expander("The daily numbers being forecast"):
+    show_table(views["series"].reset_index().rename(columns={"index": "date"}), input_dir)
+
+glossary([label_for(column) for column in ("wape", "wape_improvement_vs_baseline")])
