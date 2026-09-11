@@ -52,4 +52,40 @@ Power BI is intentionally outside the core project scope.
 
 ## Status
 
-The repository now contains the data model, SQL schema, reproducible sample-data generator, ingestion and validation layers, cleaning/quarantine pipeline, and deterministic KPI engine. The next stage will add forecasting and forecast evaluation on top of these verified analytical outputs.
+### Built and tested
+
+| Layer | What it does | Docs |
+| --- | --- | --- |
+| Data model + SQL schema | Dimensions and facts with grains and composite keys enforced in both SQL and Python | [data_model.md](docs/data_model.md) |
+| Sample-data generator | Deterministic 60-day dataset (seed 42) with controlled quality defects | — |
+| Ingestion | CSV and Excel loading by table name | — |
+| Validation | Columns, keys, ranges, referential integrity, cross-table reconciliation | — |
+| Cleaning | Quarantine-first repair with a full audit trail | [cleaning.md](docs/cleaning.md) |
+| Consolidation | Grain-safe enrichment and the commercial mart | [consolidation.md](docs/consolidation.md) |
+| KPI engine | Deterministic sales, order, fill-rate, mix, growth, and variance metrics | [kpis.md](docs/kpis.md) |
+| Forecasting | Five deterministic daily models with rolling-origin backtesting | [forecasting.md](docs/forecasting.md) |
+| Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
+
+### Measured results
+
+Numbers below come from the committed test suite and evaluation scripts, not from estimates.
+
+- **Forecast accuracy:** `seasonal_mean_7` reduces WAPE by **23.5%** against a
+  naive baseline on daily net sales (rolling-origin backtest, horizon 7,
+  4 folds, 28 scored observations). It ranks first in every backtest
+  configuration tested; 23.5% is the most conservative of those. Reproduce with
+  `python scripts/evaluate_forecasts.py`.
+- **Data quality:** validation detects **8 errors** across the 9 raw tables. Cleaning
+  imputes 3 recoverable fields, removes 2 exact duplicates, and quarantines
+  1 impossible order line, after which validation passes with zero errors.
+- **Reconciliation:** the commercial mart reconciles exactly to cleaned facts on
+  net sales, units, ordered units, and fulfilled units.
+- **Tests:** 54 automated tests covering validation, cleaning, KPIs, consolidation,
+  SQL schema conformance, forecasting, and the end-to-end pipeline.
+
+### Not yet built
+
+Trend and variance engines, driver decomposition, root-cause signals, impact
+estimation, confidence scoring, the optional LLM explanation layer, the
+Streamlit dashboard, Excel reporting, SQL marts and analytics queries, database
+ingestion, and Docker.
