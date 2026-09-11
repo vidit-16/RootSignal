@@ -24,11 +24,6 @@ dashboard = [
     "plotly>=5.22,<7",
 ]
 
-forecasting = [
-    "statsmodels>=0.14,<1",
-    "scikit-learn>=1.5,<2",
-]
-
 ai = [
     "openai>=1.50,<2",
 ]

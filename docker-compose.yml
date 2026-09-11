@@ -1,0 +1,26 @@
+# docker compose up          -> the dashboard on http://localhost:8501
+# docker compose run --rm checks
+#
+# Two services over one image: the dashboard someone looks at, and the checks
+# that back what it shows.
+
+services:
+  dashboard:
+    build: .
+    image: rootsignal
+    ports:
+      - "8501:8501"
+    volumes:
+      # Workbooks written inside the container land in the working tree.
+      - ./reports:/app/reports
+    environment:
+      # The explanation layer runs fully without this and records why it fell
+      # back to the deterministic briefing. Set it only to exercise the
+      # optional rewrite, which is verified against the computed numbers.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+
+  checks:
+    build: .
+    image: rootsignal
+    profiles: ["tools"]
+    command: pytest

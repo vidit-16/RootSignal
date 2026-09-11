@@ -1,0 +1,33 @@
+# Keep the build context small and the image reproducible.
+
+.git
+.github
+.gitignore
+
+# Regenerated inside the image from seed 42, so copying it in would risk
+# shipping a stale dataset that disagrees with the committed numbers.
+data/raw/generated
+
+# The external dataset cache is 44 MB and downloads on demand.
+data/raw/external
+
+# Build outputs, not inputs.
+reports
+*.xlsx
+
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+*.egg-info
+.venv
+venv
+.env
+
+.vscode
+.idea
+.DS_Store
+
+Dockerfile
+.dockerignore
+docker-compose.yml

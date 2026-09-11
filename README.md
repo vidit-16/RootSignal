@@ -84,13 +84,22 @@ Reproduced by the committed test suite and evaluation scripts.
 | **SQL / Python parity** | The commercial mart is implemented twice and a test asserts the two agree across **3,663 rows and 11 metric columns**. The SQL watchlist and the Python engine — sharing no code — independently flag the same two disrupted segments |
 | **Data quality** | **8 errors** detected across 10 raw tables; cleaning imputes 3 fields, drops 2 exact duplicates, quarantines 1 impossible line; **zero errors** after |
 | **Plan vs actual** | Attainment spans **82.1% to 115.6%** across 64 region/category/channel segments (27 above plan, 37 below). KAM quota attainment runs **93.0% to 110.0%** across four managers |
-| **Tests** | **268 automated tests.** One asserts that no output ever claims causation |
+| **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
+| **Tests** | **268 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
 
 ## Quick start
+
+Either install it:
 
 ```bash
 pip install -e ".[dev,dashboard]"
 python scripts/generate_sample_data.py --output-dir data/raw/generated
+```
+
+Or don't, and check the claims instead:
+
+```bash
+docker build -t rootsignal . && docker run --rm rootsignal pytest
 ```
 
 Then, in rough order of what is worth seeing first:
@@ -183,6 +192,7 @@ works fully without. Power BI is deliberately out of scope.
 | Explanation | Written briefings with no API key, plus an optional verified LLM rewrite | [explanation.md](docs/explanation.md) |
 | External data | Adapters that declare what a dataset can and cannot answer | [external_data.md](docs/external_data.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
+| Container | Dashboard, scripts and the full suite runnable without installing anything | [docker.md](docs/docker.md) |
 
 ## What it refuses to do
 
@@ -209,7 +219,7 @@ and rejected as synthetic.
 
 ## Not yet built
 
-Docker. A second external adapter is scoped and deliberately deferred — see
+A second external adapter is scoped and deliberately deferred — see
 [external_data.md](docs/external_data.md#three-candidates-checked-against-the-model).
 
 <details>

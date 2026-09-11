@@ -39,8 +39,11 @@ def _validate_history(y: pd.Series) -> pd.Series:
 def _future_index(history: pd.Series, horizon: int) -> pd.DatetimeIndex:
     if horizon < 1:
         raise ValueError("Forecast horizon must be at least 1 day.")
-    start = history.index.max() + pd.Timedelta(days=1)
-    return pd.date_range(start, periods=horizon, freq="D")
+    # Generated from the last observed day rather than by adding a timedelta to
+    # it. The arithmetic form emits a NumPy deprecation warning under numpy 2.x
+    # that is documented to become an error, and this says the same thing in one
+    # call: the horizon days that follow the history, with none of it repeated.
+    return pd.date_range(history.index.max(), periods=horizon + 1, freq="D")[1:]
 
 
 class Forecaster:
