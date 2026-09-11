@@ -1,0 +1,20 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Packaging / editable install metadata
+*.egg-info/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+
+# Generated sample data and pipeline outputs (recreated by scripts/generate_sample_data.py)
+data/raw/generated/
+data/processed/

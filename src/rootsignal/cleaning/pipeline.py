@@ -71,7 +71,14 @@ def _clean_sales(
         if unresolved:
             events.append(_event("fact_sales", "unresolved_unit_price", unresolved, "Some missing unit prices could not be recovered from the SKU master."))
 
-    # net_sales is derived from the canonical cleaned inputs. Recompute it after\n    # repairing discount or price values so the cleaned fact satisfies the same\n    # reconciliation contract enforced by DatasetValidator.\n    sales["net_sales"] = (\n        sales["units"] * sales["unit_price"] * (1 - sales["discount_pct"])\n    ).round(2)\n    sales["date"] = pd.to_datetime(sales["date"], errors="coerce").dt.date\n    return sales, pd.DataFrame(columns=sales.columns)
+    # net_sales is derived from the canonical cleaned inputs. Recompute it after
+    # repairing discount or price values so the cleaned fact satisfies the same
+    # reconciliation contract enforced by DatasetValidator.
+    sales["net_sales"] = (
+        sales["units"] * sales["unit_price"] * (1 - sales["discount_pct"])
+    ).round(2)
+    sales["date"] = pd.to_datetime(sales["date"], errors="coerce").dt.date
+    return sales, pd.DataFrame(columns=sales.columns)
 
 
 def _clean_orders(

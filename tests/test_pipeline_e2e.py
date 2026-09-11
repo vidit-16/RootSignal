@@ -1,8 +1,6 @@
 from pathlib import Path
 import subprocess
 
-import pandas as pd
-
 from rootsignal.cleaning import clean_dataset
 from rootsignal.ingestion import load_dataset
 from rootsignal.modeling.consolidation import build_commercial_mart
