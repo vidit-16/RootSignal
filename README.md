@@ -65,6 +65,7 @@ Power BI is intentionally outside the core project scope.
 | KPI engine | Deterministic sales, order, fill-rate, mix, growth, and variance metrics | [kpis.md](docs/kpis.md) |
 | Forecasting | Five deterministic daily models with rolling-origin backtesting | [forecasting.md](docs/forecasting.md) |
 | Trend and variance | Day/week/month movement, and variance against prior period, target, and forecast under one schema | [analysis.md](docs/analysis.md) |
+| Driver decomposition | Exact attribution of a movement to segments, with rate/mix separation for ratios | [decomposition.md](docs/decomposition.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
@@ -92,12 +93,17 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
   while order volume in those same segments *rose* 9.5% and ordered units rose
   6.3%. Demand could have fallen and did not, which is what makes this a supply
   signal rather than a demand signal.
-- **Tests:** 85 automated tests covering validation, cleaning, KPIs, consolidation,
-  SQL schema conformance, forecasting, trend and variance analysis, and the
-  end-to-end pipeline.
+- **Attribution accuracy:** driver decomposition locates the seeded supply
+  disruption unaided. Given only a fill-rate movement across every region and
+  category, it ranks **BLR Fruits and BLR Vegetables first and second** without
+  either being named as an input. Contributions reconstruct the observed movement
+  exactly, for additive metrics and for rates.
+- **Tests:** 110 automated tests covering validation, cleaning, KPIs, consolidation,
+  SQL schema conformance, forecasting, trend and variance analysis, driver
+  decomposition, and the end-to-end pipeline.
 
 ### Not yet built
 
-Driver decomposition, root-cause signals, impact estimation, confidence scoring,
-the optional LLM explanation layer, the Streamlit dashboard, Excel reporting,
-SQL marts and analytics queries, database ingestion, and Docker.
+Root-cause signals, impact estimation, confidence scoring, the optional LLM
+explanation layer, the Streamlit dashboard, Excel reporting, SQL marts and
+analytics queries, database ingestion, and Docker.
