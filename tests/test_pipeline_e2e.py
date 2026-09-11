@@ -1,27 +1,10 @@
-from pathlib import Path
-import subprocess
-
 from rootsignal.cleaning import clean_dataset
-from rootsignal.ingestion import load_dataset
 from rootsignal.modeling.consolidation import build_commercial_mart
 from rootsignal.validation import DatasetValidator
 
-ROOT = Path(__file__).resolve().parents[1]
 
-
-def test_generated_data_flows_through_rootsignal_pipeline(tmp_path: Path) -> None:
-    subprocess.run(
-        [
-            "python",
-            str(ROOT / "scripts" / "generate_sample_data.py"),
-            "--output-dir",
-            str(tmp_path),
-        ],
-        check=True,
-        cwd=ROOT,
-    )
-
-    raw_tables = load_dataset(tmp_path)
+def test_generated_data_flows_through_rootsignal_pipeline(generated_dataset) -> None:
+    raw_tables = generated_dataset
     raw_report = DatasetValidator().validate(raw_tables)
     assert not raw_report.passed
     assert raw_report.errors()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from rootsignal.cleaning import CleaningResult, clean_dataset
@@ -12,11 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="session")
-def generated_dataset(tmp_path_factory: pytest.TempPathFactory) -> dict:
-    """Generate the controlled sample dataset once per test session.
+def generated_dataset_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Run the controlled sample generator once per test session.
 
-    The generator is deterministic (seed 42), so a single run is safe to
-    share across tests and avoids paying the subprocess cost repeatedly.
+    The generator is deterministic (seed 42), so one run serves every test
+    and the subprocess cost is paid a single time instead of per test.
     """
     output_dir = tmp_path_factory.mktemp("sample_data")
     subprocess.run(
@@ -25,10 +26,26 @@ def generated_dataset(tmp_path_factory: pytest.TempPathFactory) -> dict:
         cwd=ROOT,
         capture_output=True,
     )
-    return load_dataset(output_dir)
+    return output_dir
 
 
 @pytest.fixture(scope="session")
-def cleaned_dataset(generated_dataset: dict) -> CleaningResult:
-    """Cleaned view of the shared sample dataset."""
+def _loaded_dataset(generated_dataset_dir: Path) -> dict[str, pd.DataFrame]:
+    """Session-wide source tables. Tests receive copies, never this dict."""
+    return load_dataset(generated_dataset_dir)
+
+
+@pytest.fixture
+def generated_dataset(_loaded_dataset: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Per-test copy of the raw generated dataset.
+
+    Frames are copied so a test that repairs or reassigns a table cannot
+    leak that change into another test sharing the session-wide load.
+    """
+    return {name: frame.copy() for name, frame in _loaded_dataset.items()}
+
+
+@pytest.fixture
+def cleaned_dataset(generated_dataset: dict[str, pd.DataFrame]) -> CleaningResult:
+    """Cleaned view of the sample dataset, isolated per test."""
     return clean_dataset(generated_dataset)
