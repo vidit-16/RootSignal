@@ -388,3 +388,133 @@ def test_the_guard_is_stricter_than_the_tolerance_it_replaced() -> None:
     """
     assert not verify_numbers("impact of 8,975", GUARD_PACKAGE).verified
     assert verify_numbers("impact of 8,971", GUARD_PACKAGE).verified
+
+
+# --- Boundaries -------------------------------------------------------------
+#
+# Mutation testing moved each of these thresholds by one and the suite stayed
+# green, which means the numbers were documented but not defended. A guard
+# whose limits can shift without a test failing is a guard whose behaviour
+# nobody has actually agreed to.
+
+
+def test_the_structural_threshold_sits_at_twelve() -> None:
+    """Twelve is a list marker; thirteen is a figure that needs evidence."""
+    assert verify_numbers("12 of the checks", GUARD_PACKAGE).verified
+    assert not verify_numbers("13 of the checks", GUARD_PACKAGE).verified
+
+
+def test_the_year_range_includes_its_own_bounds() -> None:
+    """1900 and 2100 are dates. A year either side of them is a figure."""
+    assert verify_numbers("since 1900", GUARD_PACKAGE).verified
+    assert verify_numbers("until 2100", GUARD_PACKAGE).verified
+    assert not verify_numbers("since 1899", GUARD_PACKAGE).verified
+    assert not verify_numbers("until 2101", GUARD_PACKAGE).verified
+
+
+def test_half_a_unit_is_inside_the_tolerance_and_more_is_not() -> None:
+    """The boundary is inclusive: exactly half a unit still rounds to the figure.
+
+    8,970.5 is written 8971 by any correct rounding, and 0.5 is the most a
+    whole-number rounding can be out by. A test that only checked a comfortable
+    difference would let the comparison tighten to < without failing.
+    """
+    package = {"impact": 8970.5}
+    assert verify_numbers("impact of 8,971", package).verified
+    assert not verify_numbers("impact of 8,972", package).verified
+
+
+def test_the_tolerance_follows_the_precision_the_text_used() -> None:
+    """A figure written to one decimal is allowed a twentieth, not a half.
+
+    1.048 is 1.0 at one decimal place, and the difference is 0.048 -- inside a
+    tolerance built on tenths and outside anything smaller. This is what pins
+    the base of the power to ten.
+    """
+    # 1.448 deliberately: its whole-number and two-decimal roundings are 1 and
+    # 1.45, so neither matches "1.4" outright and the tolerance is what decides.
+    # A value like 1.048 would have been accepted on round(1.048) == 1 without
+    # the comparison ever running.
+    package = {"ratio": 1.448}
+    assert verify_numbers("a ratio of 1.4", package).verified
+    assert not verify_numbers("a ratio of 1.3", package).verified
+
+
+def test_a_rate_of_exactly_one_still_converts_to_a_percentage() -> None:
+    """The conversion boundary is inclusive, so a rate of 1.0 is 100%."""
+    assert verify_numbers("attainment of 100%", {"rate": 1.0}).verified
+
+
+def test_every_figure_is_counted_once() -> None:
+    """checked reports how much work the guard did, so it has to be right."""
+    result = verify_numbers("impact of 8,970.60 against 8,971", GUARD_PACKAGE)
+    assert result.checked == 2
+    assert verify_numbers("3 of 6 checks", GUARD_PACKAGE).checked == 0
+
+
+def test_both_halves_of_the_gate_have_to_pass() -> None:
+    """verify() is an and. Either failure alone must stop the text.
+
+    Mutated to an or, faithful-but-causal text would publish, which is the
+    failure the language check exists to prevent.
+    """
+    clean = "impact of 8,970.60"
+    causal = "impact of 8,970.60, caused by the stockouts"
+    invented = "impact of 44,120.75"
+
+    assert verify(clean, GUARD_PACKAGE)[0]
+    assert not verify(causal, GUARD_PACKAGE)[0], "numbers fine, language is not"
+    assert not verify(invented, GUARD_PACKAGE)[0], "language fine, numbers are not"
+
+
+# --- Reading a figure the way the text wrote it ------------------------------
+
+
+def test_a_number_without_separators_is_read_whole() -> None:
+    """8970.60 is one figure, not 897 and 0.60.
+
+    The grouped branch of the pattern used to match the first three digits of an
+    unseparated number and win by being first. Faithful text was rejected for a
+    figure it had copied exactly, and an invented 1230 could pass on the back of
+    a 123 sitting somewhere in the evidence.
+    """
+    assert verify_numbers("impact of 8970.60", GUARD_PACKAGE).verified
+    assert not verify_numbers("impact of 1230", {"figure": 123.0}).verified
+
+
+def test_a_fraction_above_one_is_accepted_as_a_percentage() -> None:
+    """change_pct is a fraction, and a spike makes it larger than one.
+
+    Cancellations rising from 2 to 33 is a change_pct of 15.5, which the briefing
+    writes as 1550%. The guard used to refuse its own faithful sentence, because
+    the conversion in known_values only reaches values at or below one.
+    """
+    package = {"evidence": {"cancelled_units": {"change_pct": 15.5}}}
+    assert verify_numbers("cancellations rose 1550%", package).verified
+    assert not verify_numbers("cancellations rose 1560%", package).verified
+
+
+def test_a_scaled_reading_keeps_the_precision_it_was_written_with() -> None:
+    """Dividing by a hundred moves the precision two places, not three.
+
+    Written to one decimal, 1550.3% is a correct rounding of a change_pct of
+    15.5032 and nothing finer. Held to a place more it would be rejected.
+
+    The token needs its own decimal for this to bite: for a whole-percent token
+    the two-decimal rounding in known_values already supplies an exact match, so
+    the scaled comparison never decides anything.
+    """
+    package = {"evidence": {"cancelled_units": {"change_pct": 15.5032}}}
+    assert verify_numbers("cancellations rose 1550.3%", package).verified
+    assert not verify_numbers("cancellations rose 1551.9%", package).verified
+
+
+def test_a_small_count_does_not_vouch_for_a_percentage() -> None:
+    """Five met criteria must not support "500%".
+
+    Reading a percentage back to its fraction is what lets 1550% through. Applied
+    without care it would also let any small count stand behind a figure a
+    hundred times its size, which no evidence here ever claimed.
+    """
+    package = {"confidence": {"criteria_met": 5, "criteria_total": 6}}
+    assert not verify_numbers("a rise of 500%", package).verified

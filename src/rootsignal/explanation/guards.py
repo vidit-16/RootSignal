@@ -17,7 +17,17 @@ import re
 from dataclasses import dataclass, field
 
 # Numbers with optional thousands separators, decimals, sign and percent sign.
-NUMBER_PATTERN = re.compile(r"[-+]?\d{1,3}(?:,\d{3})*(?:\.\d+)?%?|[-+]?\d+(?:\.\d+)?%?")
+#
+# The grouped alternative requires at least one ,ddd group. With * it also
+# matched the first three digits of an unseparated number, and because
+# alternation is ordered that shorter match won: 8970.60 was read as 897 and
+# 0.60, and 1550% as 155 and 0%. Faithful text was rejected for figures it had
+# copied correctly, and an invented 1230 could pass whenever 123 happened to be
+# in the evidence.
+NUMBER_PATTERN = re.compile(
+    r"[-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?%?"  # 8,970.60
+    r"|[-+]?\d+(?:\.\d+)?%?"                 # 8970.60
+)
 
 # Dates are removed before figures are looked for. An ISO date shreds into
 # fragments under the number pattern — 2026-02-23 becomes 202, -23, 202 — and
@@ -120,6 +130,41 @@ def _is_rounded_form_of(value: float, candidate: float, places: int) -> bool:
     return abs(value - candidate) <= 0.5 * (10.0 ** -places)
 
 
+def _is_structural(value: float) -> bool:
+    """A small whole number is a count or a list marker, not a business figure."""
+    return abs(value) <= STRUCTURAL_MAX and float(value).is_integer()
+
+
+def _supported(token: str, value: float, accepted: set[float]) -> bool:
+    """Whether the evidence holds this figure, read the way the text wrote it.
+
+    A percent sign says the writer scaled something by a hundred, and the
+    evidence keeps the unscaled figure: change_pct is change / abs(before), so a
+    cancellation spike of 15.5 is written 1550%. Matching only the face value
+    rejected that, and the conversion in known_values cannot reach it either --
+    that one converts values at or below one, and a fraction above one is still a
+    fraction.
+
+    Dividing by a hundred carries the precision two places with it, so "1550%" is
+    still pinned to the fraction it was written from: 15.5 matches and 15.6 does
+    not.
+
+    Structural values are excluded from the scaled reading. Without that, any
+    small count in the evidence would support a percentage a hundred times its
+    size -- five met criteria would vouch for "500%" -- which is a figure no
+    evidence here ever stood behind.
+    """
+    places = _decimals(token)
+    if any(_is_rounded_form_of(value, candidate, places) for candidate in accepted):
+        return True
+    if not token.endswith("%"):
+        return False
+    return any(
+        _is_rounded_form_of(value / 100.0, candidate, places + 2)
+        for candidate in accepted
+        if not _is_structural(candidate)
+    )
+
 def verify_numbers(text: str, package: dict) -> VerificationResult:
     """Confirm every figure in the text traces back to the evidence package."""
     accepted = known_values(package)
@@ -131,14 +176,13 @@ def verify_numbers(text: str, package: dict) -> VerificationResult:
         value = _parse(token)
         if value is None:
             continue
-        if abs(value) <= STRUCTURAL_MAX and float(value).is_integer():
+        if _is_structural(value):
             continue
         if float(value).is_integer() and YEAR_RANGE[0] <= value <= YEAR_RANGE[1]:
             continue
 
         checked += 1
-        places = _decimals(token)
-        if any(_is_rounded_form_of(value, candidate, places) for candidate in accepted):
+        if _supported(token, value, accepted):
             continue
         unsupported.append(token)
 

@@ -75,6 +75,35 @@ That bug surfaced by running the guard against the deterministic briefing, which
 is worth doing precisely because that text is known to be faithful. **A guard
 that rejects known-good text is broken regardless of what else it catches.**
 
+### Then it broke the same way twice more
+
+The principle above is right, and the check it prescribes was being run -- but
+only over weekly periods on a couple of dimensions. Widened to 58 briefings
+across weekly *and monthly* periods, the guard refused four of its own
+sentences. Two separate defects, both of the same family as the date bug:
+
+**The number pattern still shredded things.** The branch matching thousands
+separators used `(?:,\d{3})*` -- zero or more groups -- so it also matched the
+first three digits of a number written without separators, and ordered
+alternation meant that shorter match won. `8970.60` was read as `897` and
+`0.60`; `1550%` as `155` and `0%`. Requiring at least one group fixes it. The
+same flaw ran in the other direction too: an invented `1230` would have passed
+whenever a `123` happened to sit in the evidence.
+
+**A fraction above one is still a fraction.** `change_pct` is
+`change / abs(before)`, so cancellations rising from 2 to 33 give 15.5, and the
+briefing writes `1550%`. The conversion in `known_values` only converts values
+at or below one -- a reasonable guess that a rate is a rate -- so nothing in the
+accepted set could match. The percent sign is now read as what it is: a
+statement that the evidence may hold the figure divided by a hundred, pinned to
+two further decimal places so `1550%` still means 15.5 and not 15.6.
+
+Small whole numbers are excluded from that second reading. Without it, five met
+criteria would vouch for `500%`.
+
+The widened sweep is the durable part of the fix. A guard is only known to
+accept faithful text over the range of text it was actually tried on.
+
 ## What the model is given
 
 The finished analysis, and nothing else. No tables, no raw data, no schema. The
