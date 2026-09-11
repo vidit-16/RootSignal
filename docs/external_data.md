@@ -134,15 +134,24 @@ recorded because both produced a confident and wrong answer first.
 
 **Filtering thin segments changes the answer.** Forty countries appear, and most
 carry a handful of units where a rate swings from 75% to 0% without meaning
-anything. The obvious response is to drop them. Dropping removes volume from the
-denominator, which changes the weight of every country that remains, and so
-changes the movement being explained. A first pass that filtered to countries
-above 500 units reported the rate effect at 89% of the movement. That number
-described a business with a different volume distribution from the real one.
+anything. The obvious response is to drop them, and a first pass did, keeping
+countries above 500 units and reporting the rate effect at 89% of the movement.
+
+Dropping removes volume from the denominator, which changes the weight of every
+country that remains and so changes the movement being explained. A unit test
+pins the size of that: on a fixture of one large segment and three near-empty
+ones, dropping moves the observed movement from `+0.00809` to `+0.00900`. The
+effects would reconstruct a number the business never posted.
 
 Thin segments are now **folded** into `Other (below volume floor)`: their
 numerators and denominators are added together, so the weights and the total are
 untouched and the effects still reconstruct the observed movement exactly.
+
+That first 89% cannot be reproduced today, and the reason is the better half of
+the story: the guard described below now **refuses** the filtered decomposition
+outright, because filtering is what strands a numerator with no denominator
+behind it. The figure was also computed across the partial December below. Two
+independent defects, one flattering number.
 
 **The last month is not a month.** The file stops on 9 December 2011. Returns
 keep arriving against goods bought in November, so December shows returns
@@ -162,6 +171,12 @@ The return rate fell 5.19 points, and 87% of that is countries genuinely
 returning less rather than demand moving between them. A coherence of 0.92 says
 the rate effect moved in one direction across the business instead of cancelling
 out. The United Kingdom carries it: 10.9% returned to 4.5%.
+
+Holding the periods fixed and filtering instead of folding gives the same 87.3%,
+which is worth saying plainly: on this dataset the floor changes the reading much
+less than the calendar does. Including the partial December puts the rate effect
+at 94.8% of a movement of **+24.1 points** rather than −5.2. The wrong period is
+the larger error by far, and it is the one that looks like a finding.
 
 ### A guard the real data earned
 
