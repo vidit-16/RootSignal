@@ -71,6 +71,26 @@ def _clean_sales(
         if unresolved:
             events.append(_event("fact_sales", "unresolved_unit_price", unresolved, "Some missing unit prices could not be recovered from the SKU master."))
 
+    # A line priced at or below zero is not a sale. Real transaction data carries
+    # samples, adjustments and corrections at zero price, and occasionally a
+    # negative one. They cannot be repaired into a sale without inventing a price
+    # nobody paid, so they are quarantined and stay visible. Generated data
+    # contains none, so this is inert there.
+    impossible_price = sales["unit_price"].notna() & (sales["unit_price"] <= 0)
+    impossible_units = sales["units"] <= 0
+    unsellable = impossible_price | impossible_units
+    price_quarantine = sales.loc[unsellable].copy()
+    if len(price_quarantine):
+        events.append(
+            _event(
+                "fact_sales",
+                "quarantine_unsellable_lines",
+                len(price_quarantine),
+                "Lines priced at or below zero, or with no units, cannot be a sale.",
+            )
+        )
+        sales = sales.loc[~unsellable].copy()
+
     # net_sales is derived from the canonical cleaned inputs. Recompute it after
     # repairing discount or price values so the cleaned fact satisfies the same
     # reconciliation contract enforced by DatasetValidator.
@@ -78,7 +98,7 @@ def _clean_sales(
         sales["units"] * sales["unit_price"] * (1 - sales["discount_pct"])
     ).round(2)
     sales["date"] = pd.to_datetime(sales["date"], errors="coerce").dt.date
-    return sales, pd.DataFrame(columns=sales.columns)
+    return sales.reset_index(drop=True), price_quarantine.reset_index(drop=True)
 
 
 def _clean_orders(

@@ -21,3 +21,6 @@ data/processed/
 
 # Generated Excel workbooks (rebuilt by scripts/build_excel_reports.py)
 reports/
+
+# Downloaded public datasets (fetched by the adapter on demand)
+data/raw/external/

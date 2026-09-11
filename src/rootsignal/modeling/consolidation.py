@@ -209,7 +209,10 @@ def aggregate_commercial_metrics(
     ]
     for column in numeric_columns:
         if column in mart.columns:
-            mart[column] = mart[column].fillna(0)
+            # Coerce before filling. When one fact is empty the outer join leaves
+            # an object-dtype column, and filling that without coercing both warns
+            # and leaves the column untyped for every arithmetic step after it.
+            mart[column] = pd.to_numeric(mart[column], errors="coerce").fillna(0)
 
     mart["fill_rate"] = mart["fulfilled_units"].div(
         mart["ordered_units"].where(mart["ordered_units"] != 0)

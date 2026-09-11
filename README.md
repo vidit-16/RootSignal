@@ -74,12 +74,20 @@ Power BI is intentionally outside the core project scope.
 | Dashboard | Five Streamlit pages over a Streamlit-free, tested data layer | [dashboard.md](docs/dashboard.md) |
 | Presentation | One map from schema keys to language a business reader already has | [dashboard.md](docs/dashboard.md#the-words-on-the-screen) |
 | Explanation | Written briefings with no API key, plus an optional verified LLM rewrite | [explanation.md](docs/explanation.md) |
+| External data | Adapters that declare what a dataset can and cannot answer | [external_data.md](docs/external_data.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
 
 Numbers below come from the committed test suite and evaluation scripts, not from estimates.
 
+- **Runs on real data, not only its own:** the pipeline is run unchanged against
+  **UCI Online Retail II** — a million real invoice lines from a UK retailer over
+  739 days. Validation finds 3 defects in the published data, cleaning quarantines
+  2,590 unsellable lines, and validation then passes with zero errors. Forecast
+  accuracy improves **38.8%** over the naive baseline across 49 backtest folds,
+  and the same model wins as on the generated data. Reproduce with
+  `python scripts/run_external_dataset.py`.
 - **Scenario detection:** the dataset carries four deliberately different
   situations — a supply constraint, a demand decline, a mix shift, and a region
   where nothing happens. The engine **correctly classifies all three planted
@@ -110,7 +118,7 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
 - **Variance coverage:** plan-versus-actual attainment spans **82.1% to 115.6%**
   across 64 region/category/channel segments (27 above plan, 37 below). KAM quota
   attainment runs 93.0% to 110.0% across the four key account managers.
-- **Tests:** 240 automated tests covering validation, cleaning, KPIs, consolidation,
+- **Tests:** 256 automated tests covering validation, cleaning, KPIs, consolidation,
   SQL schema conformance and parity, forecasting, trend and variance analysis,
   driver decomposition, impact estimation, signal assembly, scenario evaluation,
   Excel reporting, and the dashboard data layer. One asserts that no signal output
@@ -128,6 +136,7 @@ python scripts/evaluate_signals.py            # scenario detection accuracy
 python scripts/evaluate_forecasts.py          # forecast accuracy
 python scripts/explain_signals.py             # signals written up in plain English
 python scripts/run_sql_query.py               # the analytical SQL queries
+python scripts/run_external_dataset.py        # the same pipeline on real public data
 ```
 
 ### Not yet built
