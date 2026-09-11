@@ -36,3 +36,29 @@ jobs:
 
       - name: Run Ruff checks
         run: ruff check .
+
+  container:
+    name: Container builds and passes its own tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # The image is a documented entry point in the README, so a Dockerfile
+      # that stops building is a broken promise rather than a stale extra.
+      - name: Build the image
+        run: docker build -t rootsignal .
+
+      # The image resolves the top of the declared dependency range rather than
+      # a lockfile. Running the suite inside it is what catches a dependency
+      # that has moved under the project, which is how the numpy 2.x
+      # deprecation in the forecasting layer was found.
+      - name: Run the suite inside the image
+        run: docker run --rm rootsignal pytest
+
+      - name: Check the worked example still reproduces
+        run: |
+          docker run --rm rootsignal \
+            python scripts/detect_signals.py --current-period 2026-02-16 \
+            | grep -q "BLR | Fruits"
