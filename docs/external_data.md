@@ -223,13 +223,99 @@ have real transactions or plausible targets; not both.
 **A fill rate publishes your failures.** In-full delivery needs ordered quantity
 against shipped quantity, line by line. No company releases "we failed to
 deliver 8% of what customers asked for". The closest public data reaches is the
-*on-time* half of OTIF — DataCo Smart Supply Chain carries scheduled against
-actual shipping days, and Olist carries estimated against actual delivery dates.
-Neither carries in-full.
+*on-time* half of OTIF, and only one of the two datasets usually named for it
+survives inspection — see below.
 
 **Stock positions expose capacity.** Daily inventory by product and location
 reveals warehouse capacity, supplier relationships and buying patterns, so it
 stays internal.
+
+### Three candidates, checked against the model
+
+Rather than assert this, three public datasets were checked column by column
+against the five facts. The point of the exercise was to find out whether the
+adapter should be written at all.
+
+| | Online Retail II | Olist | DataCo Smart Supply Chain |
+| --- | --- | --- | --- |
+| Genuinely real | yes | yes, anonymised | **no — simulated** |
+| Licence | CC BY 4.0 | CC BY-NC-SA 4.0 | CC BY 4.0 |
+| Downloadable without an account | yes | no (Kaggle) | yes (Mendeley) |
+| Quantity per line | yes | no — units are row counts | yes, but uniform |
+| Ordered *vs* fulfilled quantity | no | no | no |
+| Stock | no | no | column present, constant |
+| Targets | no | no | no |
+
+**No candidate carries an in-full fill rate.** Olist comes closest to a
+fulfilment fact and still cannot support one: `order_status` is recorded per
+order rather than per line, so fulfilment is all-or-nothing and a "fill rate"
+derived from it would be a *completion rate* wearing a fill rate's name. That is
+the same error as reading returns as unfulfilled demand, and it is refused for
+the same reason.
+
+Olist would genuinely contribute a real `cancellation_rate` — 0.19% in December
+2017 against 1.29% in August 2018 — real state and category dimensions rather
+than the approximations Online Retail forces, and an on-time delivery rate
+moving between 1.4% and 21.4% a month. It remains the reasonable second adapter.
+The cost is an API token, which would end the property that this project can be
+cloned and run.
+
+### One of the three is not real data
+
+DataCo Smart Supply Chain is among the most-used supply-chain datasets on
+Kaggle, is published under a permissive licence, downloads without an account,
+and carries exactly the columns this project wants: a real quantity per line,
+scheduled against actual shipping days, and a stock-availability flag. On paper
+it was the better candidate.
+
+It is a simulation. Cross-tabulating scheduled against actual shipping days:
+
+```
+Days scheduled →     actual:  0     1      2      3      4      5      6
+        0                  5080  4657      0      0      0      0      0
+        1                     0     0  27814      0      0      0      0
+        2                     0     0   7138   7065   6978   7052   6983
+        4                     0     0  21666  21700  21535  21111  21740
+```
+
+Every one of 27,814 shipments scheduled for one day arrived in exactly two. Not
+one early, not one late. The remaining rows are flat uniform draws across five
+outcomes. Real transit times are right-skewed with a mode.
+
+Three further checks agree:
+
+- **Order quantities are uniform.** Quantities 3, 4 and 5 take 33.32%, 33.30%
+  and 33.38% of their group. Real order quantities follow a power law.
+- **Late delivery carries no geography.** Across five markets on five
+  continents — Africa 54.59%, Europe 55.21%, LATAM 54.36%, Pacific Asia 55.05%,
+  USCA 54.80% — the spread is 0.85 points. Across 37 months it ranges 51.9% to
+  56.9%, standard deviation 1.01: no season, no peak, no trend. Olist's real
+  late rate moves between 1.4% and 21.4% and shows Black Friday 2017 at 14.3%.
+- **The stock flag is constant.** `Product Status` is `0` for all 180,519 rows,
+  so the one inventory column in any candidate carries no information. The
+  catalogue is 118 products at 75 distinct prices, and leading digits in `Sales`
+  deviate sharply from Benford's law (44.1% ones against 30.1% expected).
+
+Nothing here impugns the dataset — it is published for machine-learning
+benchmarks, where a generative process is not a defect. It is recorded because
+the decision hung on it. Adding it and describing the result as validation
+against real-world data would have been a false claim in the README, and a
+readily falsifiable one.
+
+The rule it produced: **a dataset is checked for a generative signature before
+it is adopted, not after.** Uniform distributions where a business process
+should be skewed, and constant rates across segments that should differ, are
+what to look for.
+
+Every figure above was measured on the published files, so the checks can be
+repeated:
+
+- DataCo Smart Supply Chain — Constante, Silva and Pereira (2019), Mendeley
+  Data V5, <https://doi.org/10.17632/8gx2fvg2k6.5> · CC BY 4.0. 180,519 rows;
+  no account required.
+- Olist Brazilian E-Commerce —
+  <https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce> · CC BY-NC-SA
+  4.0. 99,441 orders, 112,650 item lines, September 2016 to October 2018.
 
 ### Which is why a generated dataset is the right tool, not a fallback
 
@@ -261,7 +347,15 @@ It is the only kind of data that can measure whether a diagnosis is correct.
    labelled as approximations in the capability notes.
 3. **One external dataset.** Two would be better evidence of generality than
    one, and the adapter interface exists so that adding another is a mapping
-   rather than a rewrite.
-4. **The download needs network access**, so it is a script rather than part of
+   rather than a rewrite. Olist is the identified candidate and was not adopted
+   for a stated reason rather than an unexamined one: it needs an API token,
+   which would end the property that this project can be cloned and run.
+4. **The period volume floor does not exist.** `min_share` folds thin *segments*;
+   there is no equivalent for thin *periods*. Online Retail does not need one,
+   because its only ragged edge is a truncated final month and period
+   completeness already handles that. Olist would need it — five of its months
+   carry fewer than 500 orders, four of them fewer than twenty, and they are
+   complete calendar months, so completeness metadata would not catch them.
+5. **The download needs network access**, so it is a script rather than part of
    the test suite. The adapter tests use a small in-memory fixture shaped like
    the real file, including its defects.
