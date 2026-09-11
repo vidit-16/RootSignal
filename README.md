@@ -66,6 +66,8 @@ Power BI is intentionally outside the core project scope.
 | Forecasting | Five deterministic daily models with rolling-origin backtesting | [forecasting.md](docs/forecasting.md) |
 | Trend and variance | Day/week/month movement, and variance against prior period, target, and forecast under one schema | [analysis.md](docs/analysis.md) |
 | Driver decomposition | Exact attribution of a movement to segments, with rate/mix separation for ratios | [decomposition.md](docs/decomposition.md) |
+| Impact estimation | Fulfilment shortfall valued at realised prices, with every assumption stated | [signals.md](docs/signals.md) |
+| RootSignal engine | Evidence, pattern, impact, confidence and recommended investigation, ranked | [signals.md](docs/signals.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
@@ -98,12 +100,19 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
   category, it ranks **BLR Fruits and BLR Vegetables first and second** without
   either being named as an input. Contributions reconstruct the observed movement
   exactly, for additive metrics and for rates.
-- **Tests:** 110 automated tests covering validation, cleaning, KPIs, consolidation,
+- **End-to-end signal detection:** given only a fill-rate movement across every
+  region and category, with nothing naming Bengaluru, Fruits or supply, the engine
+  returns **BLR Fruits** as its top signal: a fulfilment constraint at **high
+  confidence (6 of 6 criteria)**, an estimated impact of **9,174**, and a concrete
+  recommended investigation. A second segment on the same run is classified as
+  demand softness instead, so the classifier discriminates rather than labelling
+  everything a supply problem. Reproduce with `python scripts/detect_signals.py`.
+- **Tests:** 140 automated tests covering validation, cleaning, KPIs, consolidation,
   SQL schema conformance, forecasting, trend and variance analysis, driver
-  decomposition, and the end-to-end pipeline.
+  decomposition, impact estimation, signal assembly, and the end-to-end pipeline.
+  One asserts that no signal output ever claims causation.
 
 ### Not yet built
 
-Root-cause signals, impact estimation, confidence scoring, the optional LLM
-explanation layer, the Streamlit dashboard, Excel reporting, SQL marts and
-analytics queries, database ingestion, and Docker.
+The optional LLM explanation layer, the Streamlit dashboard, Excel reporting,
+SQL marts and analytics queries, database ingestion, and Docker.
