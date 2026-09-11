@@ -55,3 +55,18 @@ The KPI engine does not join raw sales facts directly to raw target facts becaus
 3. KPI functions accept explicit `group_by` dimensions so the caller controls analytical grain.
 4. The forecasting and driver-analysis layers should consume these aggregated metrics rather than recomputing them independently.
 5. The dashboard and Excel reporting layers should display these KPI outputs without changing their definitions.
+
+## Order counts are not additive across every grain
+
+`order_count` is a distinct count of `order_id`, correct at whatever grain it is
+computed. It is **not** safe to sum across a breakdown that splits an order.
+
+Orders are baskets, so one order can carry a fruit line and a vegetable line.
+At a grain including `category` that order sits in two cells, counted once in
+each — correct in both, double-counted the moment they are added. Summing the
+daily mart's `order_count` across categories reported 6,667 orders against an
+actual 4,846 until it was fixed.
+
+Units, sales and other quantities are additive. Counts of a thing that spans
+cells are not, and a company-level order count must be a distinct count taken
+from the fact.

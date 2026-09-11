@@ -18,3 +18,6 @@ venv/
 # Generated sample data and pipeline outputs (recreated by scripts/generate_sample_data.py)
 data/raw/generated/
 data/processed/
+
+# Generated Excel workbooks (rebuilt by scripts/build_excel_reports.py)
+reports/

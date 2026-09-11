@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from rootsignal.ingestion import load_dataset
+import pytest
+
+from rootsignal.ingestion import DATABASE_TABLES, load_dataset
 from rootsignal.validation import DatasetValidator
 
 
@@ -43,3 +45,41 @@ def test_validator_accepts_clean_transaction_set(generated_dataset) -> None:
     report = DatasetValidator().validate(tables)
     assert report.passed
     assert not report.errors()
+
+
+# --------------------------------------------------------------------------
+# Database ingestion
+# --------------------------------------------------------------------------
+
+
+def test_tables_can_be_loaded_from_a_live_database(cleaned_dataset) -> None:
+    """CSV and Excel are not the only shape operational data arrives in."""
+    from rootsignal.ingestion import load_from_database
+    from rootsignal.sql import build_database
+
+    tables = cleaned_dataset.tables
+    connection = build_database(tables)
+    loaded = load_from_database(connection)
+
+    assert set(loaded) == set(DATABASE_TABLES)
+    assert len(loaded["fact_sales"]) == len(tables["fact_sales"])
+    assert len(loaded["fact_orders"]) == len(tables["fact_orders"])
+
+
+def test_database_ingestion_reports_missing_tables(cleaned_dataset) -> None:
+    from rootsignal.ingestion import load_from_database
+    from rootsignal.sql import build_database
+
+    connection = build_database(cleaned_dataset.tables)
+    with pytest.raises(ValueError, match="missing expected tables"):
+        load_from_database(connection, tables=["fact_sales", "fact_returns"])
+
+
+def test_database_ingestion_refuses_an_unsafe_table_name(cleaned_dataset) -> None:
+    """Table names are interpolated into SQL, so they are checked rather than trusted."""
+    from rootsignal.ingestion import load_database_table
+    from rootsignal.sql import build_database
+
+    connection = build_database(cleaned_dataset.tables)
+    with pytest.raises(ValueError, match="unsafe name"):
+        load_database_table(connection, "fact_sales; DROP TABLE dim_sku")

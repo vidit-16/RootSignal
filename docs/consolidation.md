@@ -38,3 +38,13 @@ Zero ordered units produce an undefined fill rate and cancellation rate rather t
 ## Why this matters
 
 This layer is the bridge between cleaned operational data and downstream forecasting, variance analysis, driver decomposition, and root-signal generation. The same common grain can later be compared with compatible target data without creating fact-to-fact multiplication.
+
+## Key account managers
+
+`enrich_orders` resolves `kam_id` from the customer master rather than from the
+order line, because a manager owns customers rather than orders. The join is
+many-to-one on a unique customer key, so it cannot multiply order lines, and a
+test asserts that ordered units and order counts are unchanged by it.
+
+Without that column, order and fulfilment metrics could not be attributed to a
+manager at all, and KAM-level service performance would be unavailable.

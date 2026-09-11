@@ -58,7 +58,7 @@ Power BI is intentionally outside the core project scope.
 | --- | --- | --- |
 | Data model + SQL schema | Dimensions and facts with grains and composite keys enforced in both SQL and Python | [data_model.md](docs/data_model.md) |
 | Sample-data generator | Deterministic 60-day dataset (seed 42) with multi-SKU baskets, controlled quality defects, and four labelled scenarios | — |
-| Ingestion | CSV and Excel loading by table name | — |
+| Ingestion | CSV, Excel and database loading by table name | — |
 | Validation | Columns, keys, ranges, referential integrity, cross-table reconciliation | — |
 | Cleaning | Quarantine-first repair with a full audit trail | [cleaning.md](docs/cleaning.md) |
 | Consolidation | Grain-safe enrichment and the commercial mart | [consolidation.md](docs/consolidation.md) |
@@ -70,6 +70,7 @@ Power BI is intentionally outside the core project scope.
 | RootSignal engine | Evidence, pattern, impact, confidence and recommended investigation, ranked | [signals.md](docs/signals.md) |
 | Scenario evaluation | Measures whether the engine tells four planted situations apart | [signals.md](docs/signals.md) |
 | SQL layer | Staging views, commercial mart and seven business queries, all executed by tests | [sql.md](docs/sql.md) |
+| Excel reporting | Six operational workbooks, each opening with what its figures mean | [reporting.md](docs/reporting.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
@@ -106,12 +107,11 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
 - **Variance coverage:** plan-versus-actual attainment spans **82.1% to 115.6%**
   across 64 region/category/channel segments (27 above plan, 37 below). KAM quota
   attainment runs 93.0% to 110.0% across the four key account managers.
-- **Tests:** 165 automated tests covering validation, cleaning, KPIs, consolidation,
+- **Tests:** 180 automated tests covering validation, cleaning, KPIs, consolidation,
   SQL schema conformance and parity, forecasting, trend and variance analysis,
-  driver decomposition, impact estimation, signal assembly, and scenario
-  evaluation. One asserts that no signal output ever claims causation.
+  driver decomposition, impact estimation, signal assembly, scenario evaluation,
+  and Excel reporting. One asserts that no signal output ever claims causation.
 
 ### Not yet built
 
-The optional LLM explanation layer, the Streamlit dashboard, Excel reporting,
-database ingestion, and Docker.
+The optional LLM explanation layer, the Streamlit dashboard, and Docker.
