@@ -73,6 +73,7 @@ Power BI is intentionally outside the core project scope.
 | Excel reporting | Six operational workbooks, each opening with what its figures mean | [reporting.md](docs/reporting.md) |
 | Dashboard | Five Streamlit pages over a Streamlit-free, tested data layer | [dashboard.md](docs/dashboard.md) |
 | Presentation | One map from schema keys to language a business reader already has | [dashboard.md](docs/dashboard.md#the-words-on-the-screen) |
+| Explanation | Written briefings with no API key, plus an optional verified LLM rewrite | [explanation.md](docs/explanation.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
@@ -109,7 +110,7 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
 - **Variance coverage:** plan-versus-actual attainment spans **82.1% to 115.6%**
   across 64 region/category/channel segments (27 above plan, 37 below). KAM quota
   attainment runs 93.0% to 110.0% across the four key account managers.
-- **Tests:** 211 automated tests covering validation, cleaning, KPIs, consolidation,
+- **Tests:** 240 automated tests covering validation, cleaning, KPIs, consolidation,
   SQL schema conformance and parity, forecasting, trend and variance analysis,
   driver decomposition, impact estimation, signal assembly, scenario evaluation,
   Excel reporting, and the dashboard data layer. One asserts that no signal output
@@ -125,9 +126,10 @@ python scripts/detect_signals.py              # ranked signals in the terminal
 python scripts/build_excel_reports.py         # the six workbooks
 python scripts/evaluate_signals.py            # scenario detection accuracy
 python scripts/evaluate_forecasts.py          # forecast accuracy
+python scripts/explain_signals.py             # signals written up in plain English
 python scripts/run_sql_query.py               # the analytical SQL queries
 ```
 
 ### Not yet built
 
-The optional LLM explanation layer, and Docker.
+Docker.

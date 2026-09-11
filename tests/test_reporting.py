@@ -181,3 +181,28 @@ def test_fill_rate_report_leaves_undefined_rates_blank(cleaned_dataset, tmp_path
     for row in sheet.iter_rows(min_row=2, values_only=True):
         if row[ordered_column] == 0:
             assert row[fill_rate_column] is None
+
+
+def test_signal_report_carries_a_written_briefing(cleaned_dataset, tmp_path) -> None:
+    """A written brief travels better than a table of figures.
+
+    Composed by deterministic code from the same evidence the table shows, so
+    the prose and the numbers cannot drift apart.
+    """
+    path = build_report(
+        "root_signal_report",
+        cleaned_dataset.tables,
+        tmp_path,
+        current_period="2026-02-23",
+        comparison_period="2026-02-09",
+    )
+    workbook = load_workbook(path)
+    assert "Briefing" in workbook.sheetnames
+
+    rows = list(workbook["Briefing"].iter_rows(values_only=True))
+    text = " ".join(str(cell) for row in rows for cell in row if cell)
+
+    assert len(rows) > 5
+    assert "not a measured loss" in text
+    assert "Bengaluru" in text  # names, not codes
+    assert "caused by" not in text.lower()

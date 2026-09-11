@@ -28,6 +28,7 @@ from ..forecasting import (
     rolling_origin_evaluate,
     summarise_backtest,
 )
+from ..explanation import write_briefing, write_summary
 from ..impact.estimation import BASELINE_ASSUMPTIONS
 from ..metrics import calculate_primary_secondary_mix
 from ..signals import detect_signals, signals_to_frame
@@ -240,6 +241,21 @@ def _root_signal_report(
         top_n=5,
     )
     sheets = {"Signals": signals_to_frame(signals)}
+
+    # A written brief travels better than a table of figures. Each signal is
+    # composed here by deterministic code, from the same evidence the table
+    # shows, so the prose and the numbers cannot drift apart.
+    packages = [signal.as_dict() for signal in signals]
+    briefing_rows = [{"section": "Summary", "segment": "", "text": write_summary(packages, tables)}]
+    for signal, entry in zip(signals, packages):
+        briefing = write_briefing(entry, tables)
+        for section, text in briefing.as_dict().items():
+            if section == "caveats" or not text:
+                continue
+            briefing_rows.append(
+                {"section": section.replace("_", " ").title(), "segment": signal.segment, "text": text}
+            )
+    sheets["Briefing"] = pd.DataFrame(briefing_rows)
 
     evidence_rows = []
     criteria_rows = []

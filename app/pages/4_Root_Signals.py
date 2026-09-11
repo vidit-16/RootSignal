@@ -6,10 +6,10 @@ import pandas as pd
 import streamlit as st
 
 from components.charts import comparison_bars
+from rootsignal.explanation import write_briefing, write_summary
 from rootsignal.presentation import (
     describe_criterion,
     describe_pattern,
-    explain_pattern,
     humanise_segment,
     humanise_statement,
     label_for,
@@ -17,6 +17,7 @@ from rootsignal.presentation import (
 from shared import (
     caveat,
     configure,
+    get_data,
     get_names,
     get_periods,
     get_signals,
@@ -100,6 +101,10 @@ caveat(
     "was at stake, not money we can prove was lost."
 )
 
+tables = get_data(input_dir)["tables"]
+st.markdown("#### In short")
+st.markdown(write_summary([signal.as_dict() for signal in signals], tables))
+
 for position, signal in enumerate(signals):
     readable = humanise_segment(signal.segment, names)
     with st.expander(
@@ -118,9 +123,8 @@ for position, signal in enumerate(signals):
             f"({signal.confidence.met} of {signal.confidence.total} checks)",
         )
 
-        st.markdown(f"**{explain_pattern(signal.pattern.pattern)}**")
-        if signal.pattern.corroborating:
-            st.markdown("What points that way: " + "; ".join(signal.pattern.corroborating) + ".")
+        briefing = write_briefing(signal.as_dict(), tables)
+        st.markdown(briefing.as_markdown())
 
         def readable_text(text: str) -> str:
             return humanise_statement(text, signal.segment, names)
