@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -27,6 +28,19 @@ def generated_dataset_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
         capture_output=True,
     )
     return output_dir
+
+
+@pytest.fixture(scope="session")
+def scenarios(generated_dataset_dir: Path) -> dict[str, dict]:
+    """The planted scenarios, read from the manifest the generator writes.
+
+    Tests take scenario dates from here rather than repeating them. When the
+    supply constraint moved to start on a week boundary, five tests broke on
+    dates they had hardcoded — the dates were never theirs to own. Ground truth
+    travels with the dataset, so the tests read it from there.
+    """
+    manifest = json.loads((generated_dataset_dir / "dataset_manifest.json").read_text())
+    return {scenario["name"]: scenario for scenario in manifest["scenarios"]}
 
 
 @pytest.fixture(scope="session")

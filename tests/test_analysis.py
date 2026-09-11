@@ -477,13 +477,16 @@ def test_partial_first_week_would_distort_week_over_week_movement(cleaned_datase
     assert honest["pct_change"].abs().max() < 0.2  # real weekly movement is modest
 
 
-def test_fill_rate_collapse_in_the_disrupted_segment_is_detected(cleaned_dataset) -> None:
+def test_fill_rate_collapse_in_the_disrupted_segment_is_detected(
+    cleaned_dataset, scenarios
+) -> None:
     """The seeded supply scenario must be visible to variance analysis.
 
-    From 2026-02-18 the Bengaluru fruit and vegetable segments fulfil a far
-    smaller share of demand. Weekly fill rate should fall clearly below both the
-    prior week and the service-level target once the disruption lands.
+    Once the constraint lands, the Bengaluru fruit and vegetable segments fulfil
+    a far smaller share of demand. Weekly fill rate should fall clearly below
+    both the prior week and the service-level target.
     """
+    scenario = scenarios["blr_supply_constraint"]
     tables = cleaned_dataset.tables
     weekly = summarise_by_period(tables, period="week", group_by=["region_code", "category"])
 
@@ -491,7 +494,7 @@ def test_fill_rate_collapse_in_the_disrupted_segment_is_detected(cleaned_dataset
     disrupted = trend[
         (trend["region_code"] == "BLR")
         & (trend["category"].isin(["Fruits", "Vegetables"]))
-        & (trend["period_start"] >= pd.Timestamp("2026-02-16"))
+        & (trend["period_start"] >= pd.Timestamp(scenario["current_period"]))
     ]
     assert not disrupted.empty
     assert (disrupted["absolute_change"] < 0).all()
@@ -507,7 +510,7 @@ def test_fill_rate_collapse_in_the_disrupted_segment_is_detected(cleaned_dataset
     late_disruption = against_target[
         (against_target["region_code"] == "BLR")
         & (against_target["category"].isin(["Fruits", "Vegetables"]))
-        & (against_target["period_start"] >= pd.Timestamp("2026-02-16"))
+        & (against_target["period_start"] >= pd.Timestamp(scenario["current_period"]))
     ]
     assert (late_disruption["variance"] < 0).all()
 
@@ -515,12 +518,14 @@ def test_fill_rate_collapse_in_the_disrupted_segment_is_detected(cleaned_dataset
     early = against_target[
         (against_target["region_code"] == "BLR")
         & (against_target["category"].isin(["Fruits", "Vegetables"]))
-        & (against_target["period_start"] < pd.Timestamp("2026-02-16"))
+        & (against_target["period_start"] < pd.Timestamp(scenario["current_period"]))
     ]
     assert (early["variance"] > 0).mean() > 0.5
 
 
-def test_demand_held_firm_while_fulfilment_fell_in_the_disrupted_segment(cleaned_dataset) -> None:
+def test_demand_held_firm_while_fulfilment_fell_in_the_disrupted_segment(
+    cleaned_dataset, scenarios
+) -> None:
     """The project's central question: is this a demand decline or a supply failure?
 
     Daily order volume varies in this dataset, so a demand collapse was
@@ -538,7 +543,7 @@ def test_demand_held_firm_while_fulfilment_fell_in_the_disrupted_segment(cleaned
     ].copy()
     orders["date"] = pd.to_datetime(orders["date"])
 
-    disruption_start = pd.Timestamp("2026-02-18")
+    disruption_start = pd.Timestamp(scenarios["blr_supply_constraint"]["starts"])
     before = orders[orders["date"] < disruption_start]
     after = orders[orders["date"] >= disruption_start]
 

@@ -20,35 +20,34 @@ Given nothing but a fill-rate movement across every region and category — no h
 of Bengaluru, of fruit, or of supply:
 
 ```bash
-python scripts/detect_signals.py --current-period 2026-02-16
+python scripts/detect_signals.py
 ```
 
-> **BLR | Fruits** — fill rate moved **−0.1890 (−19.4%)**
+> **BLR | Fruits** — fill rate moved **−0.2889 (−29.1%)**
 >
 > Consistent with a **fulfilment or supply constraint**: fulfilled units fell
-> while ordered units did not. Fulfilled units fell 36.0%; fulfilment fell faster
-> than demand (−20.6%); available stock fell 34.7%; stockout rate rose.
+> while ordered units did not. Fulfilled units fell 16.2%; **ordered units rose
+> 18.2%**; available stock fell 47.7%; stockout rate rose.
 >
-> Estimated impact **4,870.55**, from units not fulfilled relative to the
+> Estimated impact **8,970.60**, from units not fulfilled relative to the
 > segment's prior fill rate, valued at its realised average selling price.
 >
-> Confidence: **medium — 4 of 6 criteria met.**
-> Met: movement stands out (13.0× the segment's typical swing) · segment carries
-> 26.8% of the movement · 4 other metrics agree · movement is directional
-> (coherence 0.80). Not met: it has not yet persisted two periods · **the
-> alternative is not ruled out**.
+> Confidence: **high — 5 of 6 criteria met.**
+> Met: movement stands out (19.9× the segment's typical swing) · segment carries
+> 26.8% of the movement · 4 other metrics agree · the alternative is not
+> supported · movement is directional. Not met: **it has moved this way for one
+> period, and the threshold is two**.
 >
 > *Alternative considered:* demand weakened and fulfilment simply followed it.
-> Demand did soften, so that reading cannot be dismissed — but it does not
-> account for the movement alone, because the fill rate itself fell.
+> Orders rose 18% while shipments fell 16%, so that reading is not available.
 >
 > **Recommended investigation:** review inventory availability and replenishment
 > for BLR | Fruits, starting with the SKUs carrying the largest unfulfilled volume.
 
-The interesting part is the two unmet criteria. The planted scenario *is* a
-supply constraint, and the engine still declines to call it high confidence,
-because demand genuinely softened too. It reports the alternative rather than
-burying it.
+The interesting part is the criterion it will not claim. The alternative is
+dismissed on evidence, but the engine refuses to call a one-week step a
+persistent trend — because on the period a step change happens, it isn't one
+yet. Five of six, on the one criterion only time can settle.
 
 ## What makes it different
 
@@ -80,12 +79,12 @@ Reproduced by the committed test suite and evaluation scripts.
 | --- | --- |
 | **Scenario detection** | 4 situations planted (supply constraint, demand decline, mix shift, and a control where nothing happens). **3 of 3 correctly classified** at a medium confidence floor; **2 of 3 with zero false alarms and silence on the control** at a high floor |
 | **Real public data** | UCI Online Retail II, **1,044,420 invoice lines over 739 days**. 3 defects found in the published data, 2,590 unsellable lines quarantined, then **zero validation errors** |
-| **Forecast accuracy** | `seasonal_mean_7` beats naive by **+27.1%** WAPE on daily net sales and **+11.4%** on units; `ses` leads orders at **+22.2%**. On the real dataset, **+38.8%** across 49 folds — the same model wins on both |
+| **Forecast accuracy** | `seasonal_mean_7` beats naive by **+28.9%** WAPE on daily net sales and **+19.1%** on units; `ses` leads orders at **+22.2%**. On the real dataset, **+38.8%** across 49 folds — the same model wins on both |
 | **SQL / Python parity** | The commercial mart is implemented twice and a test asserts the two agree across **3,663 rows and 11 metric columns**. The SQL watchlist and the Python engine — sharing no code — independently flag the same two disrupted segments |
 | **Data quality** | **8 errors** detected across 10 raw tables; cleaning imputes 3 fields, drops 2 exact duplicates, quarantines 1 impossible line; **zero errors** after |
-| **Plan vs actual** | Attainment spans **82.1% to 115.6%** across 64 region/category/channel segments (27 above plan, 37 below). KAM quota attainment runs **93.0% to 110.0%** across four managers |
+| **Plan vs actual** | Attainment spans **87.4% to 125.6%** across 64 region/category/channel segments, evenly split 32 above plan and 32 below. KAM quota attainment runs **89.8% to 106.0%** across four managers, three ahead and one behind |
 | **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
-| **Tests** | **268 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+| **Tests** | **278 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
 
 ## Quick start
 
@@ -105,7 +104,7 @@ docker build -t rootsignal . && docker run --rm rootsignal pytest
 Then, in rough order of what is worth seeing first:
 
 ```bash
-python scripts/detect_signals.py --current-period 2026-02-16
+python scripts/detect_signals.py
 ```
 
 ```bash
@@ -234,7 +233,7 @@ four planted scenarios — classifying three of three correctly at a medium
 confidence floor, with zero false alarms at a high one — and runs unchanged on
 a million real invoice lines from a public dataset, where it beats a naive
 forecast baseline by 38.8% across 49 backtest folds. Python, pandas, SQL,
-Streamlit; 268 tests, including one asserting that no output ever claims
+Streamlit; 278 tests, including one asserting that no output ever claims
 causation.
 
 </details>

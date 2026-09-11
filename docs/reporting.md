@@ -14,7 +14,7 @@ its SQL parity test preventing.
 
 ```bash
 python scripts/build_excel_reports.py --list
-python scripts/build_excel_reports.py --current-period 2026-02-23 --comparison-period 2026-02-09
+python scripts/build_excel_reports.py
 ```
 
 ## Every workbook opens with what its figures mean

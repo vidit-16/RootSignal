@@ -40,7 +40,14 @@ MEAN_BASKET_LINES = sum(
 # signal engine against a single planted event only shows that it finds what it
 # was pointed at; measuring it against several shows whether it tells them
 # apart, which is the claim actually worth making.
-SUPPLY_CONSTRAINT_START = date(2026, 2, 18)
+# Starts on a Monday, so the constraint occupies whole weeks. Beginning it
+# mid-week left the week before it partly affected, which meant the default
+# comparison — the latest complete week against the one before — was measuring
+# a constrained week against a half-constrained one and reporting a muted
+# movement. The event is a step change, so it is only visible where a clean
+# period meets an affected one, and that boundary has to fall where the
+# periods do.
+SUPPLY_CONSTRAINT_START = date(2026, 2, 23)
 SUPPLY_CONSTRAINT_REGION = "BLR"
 SUPPLY_CONSTRAINT_CATEGORIES = ("Fruits", "Vegetables")
 
@@ -63,7 +70,10 @@ SCENARIOS = [
         "expected_pattern": "fulfilment_constraint",
         "metric": "fill_rate",
         "current_period": "2026-02-23",
-        "comparison_period": "2026-02-09",
+        # The week immediately before, which is now entirely clean. The
+        # evaluation and the default behaviour of detect_signals.py therefore
+        # examine the same comparison rather than two different ones.
+        "comparison_period": "2026-02-16",
         "description": (
             "Fulfilment and stock deteriorate while demand holds or grows. The "
             "segments cannot serve the orders they are receiving."
@@ -503,13 +513,12 @@ def build_inventory_and_targets(
     day_count = len(dates)
     sales_baseline = sales_df.groupby(segment_keys)["net_sales"].sum() / day_count
     order_baseline = orders_by_segment.groupby(segment_keys)["order_id"].nunique() / day_count
-    plan_bias = dict(
-        zip(sales_baseline.index, rng.normal(1.0, 0.07, size=len(sales_baseline)))
-    )
+    plan_bias = centred_plan_bias(rng, sales_baseline.index, 0.07)
 
+    plan_shape = weekday_plan_shape(dates)
     target_rows: list[list[object]] = []
     for current_date in dates:
-        weekday_uplift = 1.08 if current_date.weekday() in (4, 5) else 1.0
+        weekday_uplift = plan_shape[current_date]
         for region_code, _, _ in REGIONS:
             for category in CATEGORIES:
                 for channel in CHANNELS:
@@ -553,6 +562,44 @@ def build_inventory_and_targets(
     return inventory_df, targets_df
 
 
+def centred_plan_bias(rng: np.random.Generator, keys, spread: float) -> dict:
+    """Per-owner plan bias that averages to exactly one.
+
+    A plan is written optimistically for some segments and conservatively for
+    others, which is what makes variance analysis worth doing. Drawing that
+    bias independently also lets the whole plan drift: with four key account
+    managers, four draws from a distribution centred on one land above it
+    around one time in sixteen, and on this seed they did -- every manager
+    behind quota, with nothing in the business to explain it.
+
+    Centring the draws keeps the spread and removes the drift, so attainment
+    straddles plan for the reason the docstring claims rather than by luck.
+    """
+    draws = rng.normal(1.0, spread, size=len(keys))
+    draws = draws - draws.mean() + 1.0
+    return dict(zip(keys, draws))
+
+
+def weekday_plan_shape(dates: list[date]) -> dict[date, float]:
+    """Plan more for the days that trade harder, without planning more overall.
+
+    Friday and Saturday carry a higher quota than a Tuesday, which is how a
+    real plan is written. Applied as a flat multiplier it also raises the total
+    plan above the volume it was anchored to -- about 2.3% across a seven-day
+    week -- so every segment and every manager would miss quota by that much
+    for no reason a business would recognise. With four key account managers
+    that was enough to put all four behind plan while the docstring claimed
+    some ran ahead.
+
+    Normalising by the mean keeps the shape of the week and removes the
+    inflation, so attainment centres on the plan bias rather than on an
+    artefact of the uplift.
+    """
+    raw = {day: (1.08 if day.weekday() in (4, 5) else 1.0) for day in dates}
+    mean_uplift = sum(raw.values()) / len(raw)
+    return {day: uplift / mean_uplift for day, uplift in raw.items()}
+
+
 def build_kam_targets(
     rng: np.random.Generator,
     dimensions: dict[str, pd.DataFrame],
@@ -577,11 +624,12 @@ def build_kam_targets(
 
     sales_baseline = sales_df.groupby("kam_id")["net_sales"].sum() / day_count
     order_baseline = orders_by_kam.groupby("kam_id")["order_id"].nunique() / day_count
-    plan_bias = dict(zip(sales_baseline.index, rng.normal(1.0, 0.06, size=len(sales_baseline))))
+    plan_bias = centred_plan_bias(rng, sales_baseline.index, 0.06)
 
     rows: list[list[object]] = []
+    plan_shape = weekday_plan_shape(dates)
     for current_date in dates:
-        weekday_uplift = 1.08 if current_date.weekday() in (4, 5) else 1.0
+        weekday_uplift = plan_shape[current_date]
         for kam_id, _ in KAMS:
             bias = float(plan_bias.get(kam_id, 1.0))
             sales_target = round(
@@ -655,7 +703,7 @@ def write_dataset(output_dir: Path) -> dict[str, object]:
             "fact_orders_missing_channel": 1,
         },
         "business_scenario": (
-            "From 2026-02-18 onward, Bengaluru fruit and vegetable demand remains comparatively "
+            "From 2026-02-23 onward, Bengaluru fruit and vegetable demand remains comparatively "
             "firm while inventory and fulfillment deteriorate. This creates a reproducible scenario "
             "for variance analysis, driver decomposition, impact estimation, and root-cause investigation."
         ),

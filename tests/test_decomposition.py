@@ -267,13 +267,16 @@ def test_concentration_reports_how_localised_a_movement_is() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_decomposition_finds_the_disrupted_segments_without_being_told(cleaned_dataset) -> None:
+def test_decomposition_finds_the_disrupted_segments_without_being_told(
+    cleaned_dataset, scenarios
+) -> None:
     """The seeded supply scenario must be recoverable from the movement alone.
 
     Nothing here names Bengaluru, Fruits or Vegetables as an input. The
     decomposition is given a fill-rate movement across every region and category
     and must surface the disrupted segments on its own.
     """
+    scenario = scenarios["blr_supply_constraint"]
     weekly = summarise_by_period(
         cleaned_dataset.tables, period="week", group_by=["region_code", "category"]
     )
@@ -281,8 +284,8 @@ def test_decomposition_finds_the_disrupted_segments_without_being_told(cleaned_d
         weekly,
         "fill_rate",
         ["region_code", "category"],
-        current_period="2026-02-16",
-        comparison_period="2026-02-09",
+        current_period=scenario["current_period"],
+        comparison_period=scenario["comparison_period"],
         top_n=2,
     )
 

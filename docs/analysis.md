@@ -170,20 +170,27 @@ test asserts that ordered units and order counts are unchanged by it.
 
 ## Worked example: the seeded supply disruption
 
-From 2026-02-18 the Bengaluru fruit and vegetable segments fulfil a much smaller
+From 2026-02-23 the Bengaluru fruit and vegetable segments fulfil a much smaller
 share of demand. Weekly fill rate for BLR Fruits:
 
-| Week of | Ordered units | Fill rate |
-| --- | --- | --- |
-| 2026-02-02 | 138 | 0.971 |
-| 2026-02-09 | 180 | 0.972 |
-| 2026-02-16 | 143 | **0.783** |
-| 2026-02-23 | 169 | **0.704** |
+| Week of | Ordered units | Fulfilled units | Fill rate |
+| --- | --- | --- | --- |
+| 2026-02-02 | 138 | 134 | 0.971 |
+| 2026-02-09 | 180 | 175 | 0.972 |
+| 2026-02-16 | 143 | 142 | 0.993 |
+| 2026-02-23 | 169 | 119 | **0.704** |
 
-The constraint begins on a Wednesday, so the week starting 02-16 carries only
-five affected days. Comparing a fully affected week (02-23) against a clean one
-(02-09) shows fulfilled units falling 32% while ordered units fell 6%: the fill
-rate collapsed because fulfilment dropped far faster than the order book did.
+The constraint begins on a Monday, so the last complete week is entirely
+affected and the week before it is entirely clean. That boundary matters more
+than it looks: the event is a step change, and a step change is only visible
+where a clean period meets an affected one. An earlier version of this dataset
+began the constraint mid-week, which left the comparison week half-affected and
+reported a muted movement to anyone who did not pass explicit periods.
+
+Comparing the two weeks, **ordered units rose 18.2% while fulfilled units fell
+16.2%**, and available stock fell 47.7%. Demand did not soften; the segment
+stopped being able to serve it. That contrast is the whole basis for reading the
+movement as a supply signal rather than a demand one.
 
 **A falling fill rate is arithmetic proof that fulfilment lagged demand.** The
 ratio cannot fall unless fulfilled units fell by more than ordered units did, so

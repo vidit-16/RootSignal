@@ -91,28 +91,28 @@ coherence = |Σ effect| ÷ Σ|effect|
 
 A component whose segment effects are individually large but cancel almost
 exactly has not moved the business anywhere. For the disruption window
-(2026-02-09 to 2026-02-23) across region and category:
+(2026-02-16 to 2026-02-23) across region and category:
 
 | Component | Net | Gross | Coherence | Share of net movement |
 | --- | --- | --- | --- | --- |
-| rate_effect | −0.0440 | 0.0604 | **0.728** | 86.3% |
-| interaction_effect | −0.0069 | 0.0101 | 0.683 | 13.6% |
-| mix_effect | +0.0001 | **0.1825** | **0.0004** | 0.1% |
+| rate_effect | −0.0285 | 0.0671 | **0.424** | 74.7% |
+| interaction_effect | −0.0090 | 0.0162 | 0.552 | 23.5% |
+| mix_effect | +0.0007 | **0.2172** | **0.003** | 1.8% |
 
 Mix has by far the largest gross movement and essentially zero net movement:
 weekly demand reshuffles between sixteen fine segments without the total going
 anywhere. Reading those large individual mix effects as findings would be
 reading noise. The rate effect is smaller in gross terms but moved in one
-direction across the business, and carries 86% of the net change.
+direction across the business, and carries 75% of the net change.
 
 The disrupted segments are where that rate effect sits:
 
 | Segment | Fill rate before | after | Rate effect | Mix effect |
 | --- | --- | --- | --- | --- |
-| BLR \| Fruits | 0.9722 | 0.7041 | **−0.0201** | −0.0004 |
-| BLR \| Vegetables | 0.9514 | 0.7014 | **−0.0193** | +0.0195 |
-| BLR \| Herbs | 0.9917 | 0.9804 | −0.0006 | +0.0174 |
-| BLR \| Premium | 0.9328 | 0.9630 | +0.0017 | +0.0146 |
+| BLR \| Fruits | 0.9930 | 0.7041 | **−0.0180** | +0.0124 |
+| BLR \| Vegetables | 0.9779 | 0.7014 | **−0.0218** | +0.0186 |
+| BLR \| Herbs | 0.9412 | 0.9804 | +0.0017 | +0.0219 |
+| BLR \| Premium | 0.9597 | 0.9630 | +0.0002 | +0.0065 |
 
 Coherence is a description of how a component behaved. It is not a significance
 test and does not carry a confidence level.

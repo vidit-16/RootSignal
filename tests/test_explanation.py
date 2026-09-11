@@ -17,13 +17,17 @@ from rootsignal.signals import detect_signals
 
 
 def package(cleaned_dataset, top_n: int = 3) -> list[dict]:
+    """Signals for the planted supply constraint, on its own declared window.
+
+    The periods are not written here. The generator publishes them with the
+    dataset, so a scenario that moves does not leave this file asserting
+    against a window that no longer contains it.
+    """
     signals = detect_signals(
         cleaned_dataset.tables,
         metric="fill_rate",
         dimension=["region_code", "category"],
         period="week",
-        current_period="2026-02-23",
-        comparison_period="2026-02-09",
         top_n=top_n,
     )
     return [signal.as_dict() for signal in signals]
@@ -255,10 +259,13 @@ def test_a_faithful_rewrite_is_used(cleaned_dataset, monkeypatch) -> None:
     first = package(cleaned_dataset)[0]
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-used")
 
+    # Built from the signal rather than typed out. The guard passes a rewrite
+    # only when every figure in it matches the computed package, so a literal
+    # here would turn any change in the data into a failure of the guard.
     faithful = (
         "Deliveries in Bengaluru fell well short of what was ordered this period. "
-        "The pattern is consistent with a supply constraint, although demand also "
-        "softened. Around 8,325 of revenue was at stake."
+        "The pattern is consistent with a supply constraint rather than weaker "
+        f"demand. Around {first['impact']['value']:,.0f} of revenue was at stake."
     )
 
     class FakeCompletions:
@@ -327,3 +334,57 @@ def test_the_system_prompt_forbids_the_phrases_the_guard_catches(phrase: str) ->
 
     assert phrase in SYSTEM_PROMPT.lower()
     assert phrase in CAUSAL_PHRASES
+
+
+# --------------------------------------------------------------------------
+# The numeric guard checks rounding, not proximity
+# --------------------------------------------------------------------------
+
+
+GUARD_PACKAGE = {
+    "impact": {"value": 8970.60},
+    "evidence": {"fulfilled_change": -0.162, "ordered_change": 0.182},
+}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "units delivered fell 16%",      # 16.2 written to whole percent
+        "units delivered fell 16.2%",
+        "impact of 8,971",               # 8970.60 written to the nearest unit
+        "impact of 8,970.60",
+        "units ordered rose 18%",
+    ],
+)
+def test_a_correctly_rounded_figure_is_accepted(text: str) -> None:
+    """The briefing writes percentages to whole numbers, and must pass its own guard.
+
+    A flat proportional tolerance rejected "16%" for an evidence value of 16.2%,
+    because the two are 1.23% apart. The guard was refusing the system's own
+    faithful text.
+    """
+    assert verify_numbers(text, GUARD_PACKAGE).verified, text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "units delivered fell 19%",
+        "units delivered fell 17%",   # further than half a unit from 16.2
+        "Sales fell 99,999",
+        "a margin of 41.3%",
+    ],
+)
+def test_a_figure_that_is_not_a_rounding_of_the_evidence_is_rejected(text: str) -> None:
+    assert not verify_numbers(text, GUARD_PACKAGE).verified, text
+
+
+def test_the_guard_is_stricter_than_the_tolerance_it_replaced() -> None:
+    """8,975 sits within one percent of 8,970.60, and is still a wrong number.
+
+    The proportional tolerance this replaced allowed anything within 89 of the
+    real figure. Rounding to the precision the text used allows half a unit.
+    """
+    assert not verify_numbers("impact of 8,975", GUARD_PACKAGE).verified
+    assert verify_numbers("impact of 8,971", GUARD_PACKAGE).verified

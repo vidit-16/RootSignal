@@ -19,8 +19,8 @@ docker run --rm rootsignal pytest
 
 ```bash
 docker run --rm -p 8501:8501 rootsignal                 # the dashboard
-docker run --rm rootsignal pytest                       # all 268 tests
-docker run --rm rootsignal python scripts/detect_signals.py --current-period 2026-02-16
+docker run --rm rootsignal pytest                       # all 278 tests
+docker run --rm rootsignal python scripts/detect_signals.py
 ```
 
 Or with compose:
@@ -47,7 +47,7 @@ of the argument for having it.
 numpy 1.26.4 and pandas 2.2.2; a fresh install in the image resolves
 **numpy 2.5.3 and pandas 2.3.3**.
 
-All 268 tests pass on both. But under numpy 2.x the forecasting layer emitted
+All 278 tests pass on both. But under numpy 2.x the forecasting layer emitted
 380 deprecation warnings from a single line:
 
 ```python
@@ -66,9 +66,9 @@ return pd.date_range(history.index.max(), periods=horizon + 1, freq="D")[1:]
 Same days, no arithmetic, no warning.
 
 **The results are identical across both.** The worked example returns
-`BLR | Fruits, -0.1890, fulfilment_constraint, 4,870.55, medium` on numpy 1.26
+`BLR | Fruits, -0.2889, fulfilment_constraint, 8,970.60, high` on numpy 1.26
 under Windows and on numpy 2.5 under Linux, and `seasonal_mean_7` improves on
-the naive baseline by 27.06% in both. That is a stronger reproducibility claim
+the naive baseline by 28.88% in both. That is a stronger reproducibility claim
 than a single machine can make, and it is the reason the dependency floors are
 ranges rather than pins.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from rootsignal.analysis import summarise_by_period
 from rootsignal.impact import (
     estimate_fulfilment_shortfall,
     estimate_unfulfilled_demand,
@@ -461,30 +462,44 @@ def test_signals_flatten_into_a_reporting_table(cleaned_dataset) -> None:
     assert signals_to_frame([]).empty
 
 
-def test_transition_week_evidence_can_read_as_demand_rather_than_supply(cleaned_dataset) -> None:
+def test_a_step_change_is_nearly_invisible_in_the_period_that_straddles_it(
+    cleaned_dataset, scenarios
+) -> None:
     """An honest limitation, asserted rather than left for a reader to discover.
 
-    The constraint starts on a Wednesday. In the week that straddles it, only
-    five days are affected, and a thin segment whose weekly order volume
-    ordinarily swings by a third can show a demand dip large enough to dominate
-    the evidence. The engine reports what that week's numbers say.
+    The demand scenario begins on a Wednesday. In the week that straddles that
+    date only part of the week is affected, and the weekly total barely moves:
+    ordered units go 64, then 63, then 38. Nearly the whole decline lands in the
+    following week, because that is the first week the change occupies entirely.
 
-    This is why the evaluation compares fully affected windows, and why a signal
-    on a single transition period deserves less weight than a sustained one.
+    A reader comparing the straddling week against the one before it would
+    conclude almost nothing happened. This is why the evaluation compares fully
+    affected windows, and why the supply constraint was moved to begin on a week
+    boundary: a step change is only visible where a clean period meets an
+    affected one.
     """
-    signals = detect_signals(
-        cleaned_dataset.tables,
-        metric="fill_rate",
-        dimension=["region_code", "category"],
-        period="week",
-        current_period="2026-02-16",
-        comparison_period="2026-02-09",
-        top_n=4,
+    scenario = scenarios["hyd_demand_softness"]
+    weekly = summarise_by_period(
+        cleaned_dataset.tables, period="week", group_by=["region_code", "category"]
     )
-    disrupted = [s for s in signals if s.segment.startswith("BLR")]
-    assert disrupted, "the disrupted region should still surface in the transition week"
-    # The movement is found either way; only the reading of it is less certain.
-    assert all(s.movement < 0 for s in disrupted)
+    segment = weekly[
+        (weekly["region_code"] == scenario["region_code"])
+        & (weekly["category"].isin(scenario["categories"]))
+    ].set_index("period_start")["ordered_units"]
+
+    starts = pd.Timestamp(scenario["starts"])
+    straddling = starts - pd.Timedelta(days=starts.weekday())
+    before = straddling - pd.Timedelta(days=7)
+    first_full = straddling + pd.Timedelta(days=7)
+
+    straddle_move = segment[straddling] - segment[before]
+    full_week_move = segment[first_full] - segment[straddling]
+
+    assert full_week_move < 0, "the decline should be unmistakable once a whole week is affected"
+    assert abs(straddle_move) < abs(full_week_move) / 5, (
+        "the straddling week should hide most of the movement, "
+        f"but moved {straddle_move} against {full_week_move}"
+    )
 
 
 # --------------------------------------------------------------------------

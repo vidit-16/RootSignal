@@ -24,7 +24,7 @@ The generator is deterministic with seed `42` and produces 60 daily periods from
 
 ## Controlled scenario
 
-From 2026-02-18 onward, the Bengaluru fruit and vegetable segment contains a deliberate operating deterioration: demand stays comparatively firm while inventory and fulfillment weaken. This gives later analytics stages a reproducible business event to detect and investigate.
+From 2026-02-23 onward, the Bengaluru fruit and vegetable segment contains a deliberate operating deterioration: demand stays comparatively firm while inventory and fulfillment weaken. This gives later analytics stages a reproducible business event to detect and investigate.
 
 ## Controlled raw-data defects
 

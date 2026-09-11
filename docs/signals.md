@@ -96,7 +96,7 @@ corrected rule still required demand to have held. On the current data:
 | Ordered units | 180 | 169 | −6.1% |
 | Fulfilled units | 175 | 119 | **−32.0%** |
 | Fill rate | 0.972 | 0.704 | **−27.6%** |
-| Available stock | — | — | −49.5% |
+| Available stock | — | — | −49.1% |
 
 Demand dipped 6%; fulfilment fell 32%. Requiring demand to have held classified
 this as `demand_softness`, which is plainly wrong.
@@ -193,35 +193,41 @@ by impact alone or filtered by confidence.
 Reproduce with:
 
 ```bash
-python scripts/detect_signals.py --current-period 2026-02-23 --comparison-period 2026-02-09
+python scripts/detect_signals.py
 ```
+
+No periods are passed. The constraint occupies the last complete week, so the
+default comparison — the latest complete week against the one before — is
+already the comparison worth making.
 
 | Segment | Movement | Likely driver | Impact | Confidence | Priority |
 | --- | --- | --- | --- | --- | --- |
-| BLR \| Fruits | −0.2681 | fulfilment_constraint | 8,324.65 | high (5/6) | 8,324.65 |
-| BLR \| Vegetables | −0.2500 | fulfilment_constraint | 5,795.41 | high (5/6) | 5,795.41 |
-| DEL \| Premium | −0.0302 | fulfilment_constraint | 4,426.63 | medium (4/6) | 2,655.98 |
+| BLR \| Fruits | −0.2889 | fulfilment_constraint | 8,970.60 | high (5/6) | 8,970.60 |
+| BLR \| Vegetables | −0.2765 | fulfilment_constraint | 6,409.62 | high (5/6) | 6,409.62 |
+| DEL \| Premium | −0.0217 | unclassified | 3,180.75 | low (2/6) | 954.22 |
 
 The top signal renders as:
 
-> fill_rate in BLR | Fruits moved −0.2681 (−27.6%) for the 2026-02-23 period
-> versus 2026-02-09. The movement is **consistent with** a fulfilment or supply
+> fill_rate in BLR | Fruits moved −0.2889 (−29.1%) for the 2026-02-23 period
+> versus 2026-02-16. The movement is **consistent with** a fulfilment or supply
 > constraint: fulfilled units fell while ordered units did not. Supporting
-> evidence: fulfilled units fell (−32.0%); fulfilment fell faster than demand
-> (−6.1%) in orders; available stock fell (−49.5%); stockout rate rose.
-> Estimated impact: 8,324.65 based on units not fulfilled relative to the
-> segment's prior fill rate, valued at its realised average selling price.
-> Confidence: high (5 of 6 criteria met). Alternative considered: demand
-> weakened and the fall in fulfilment simply followed it. **Demand also softened
-> over this period, so a demand-led explanation cannot be dismissed.** It does
-> not account for the movement on its own: the fill rate fell, which means
-> fulfilment dropped by more than the order book did. Recommended investigation:
-> review inventory availability and replenishment for BLR | Fruits.
+> evidence: fulfilled units fell (−16.2%); ordered units rose (+18.2%);
+> available stock fell (−47.7%); stockout rate rose. Estimated impact: 8,970.60
+> based on units not fulfilled relative to the segment's prior fill rate, valued
+> at its realised average selling price. Confidence: high (5 of 6 criteria met).
+> Alternative considered: demand weakened and the fall in fulfilment simply
+> followed it. **Demand did not weaken over this period, so a demand-led
+> explanation is not supported by the order volumes.** Recommended
+> investigation: review inventory availability and replenishment for
+> BLR | Fruits.
 
-Note the criterion it **fails**. Demand softened 6% alongside the fulfilment
-collapse, so the alternative explanation is marked as live rather than dismissed,
-and the signal scores 5 of 6 rather than 6. A system that reported this as
-certain would be less useful, not more.
+Note the criterion it **fails**, and which one it does not. The alternative is
+dismissed here on evidence — orders rose 18% while shipments fell 16%, so a
+demand-led reading is not available. What the signal will not claim is that the
+movement has **persisted**: it has moved this way for one period, and the
+threshold is two. A step change cannot satisfy that on the period it happens,
+and the engine does not pretend otherwise. It scores 5 of 6 rather than 6, on
+the one criterion that only time can settle.
 
 ## Evaluation: can it tell situations apart?
 

@@ -34,10 +34,6 @@ YEAR_RANGE = (1900, 2100)
 # English without protecting anything.
 STRUCTURAL_MAX = 12
 
-# A figure matches if it is within this fraction of a known value, which absorbs
-# the rounding a model does when it writes 8,325 for 8,324.65.
-RELATIVE_TOLERANCE = 0.01
-
 
 @dataclass(frozen=True)
 class VerificationResult:
@@ -101,6 +97,29 @@ def _parse(token: str) -> float | None:
         return None
 
 
+def _decimals(token: str) -> int:
+    """How precisely a figure was written, in decimal places."""
+    cleaned = token.replace(",", "").rstrip("%")
+    _, _, fraction = cleaned.partition(".")
+    return len(fraction)
+
+
+def _is_rounded_form_of(value: float, candidate: float, places: int) -> bool:
+    """Whether a figure is what the candidate looks like, written to this precision.
+
+    The briefing writes percentages to whole numbers, so an evidence value of
+    16.2% appears as "16%". Measured as a relative difference that is 1.23% off
+    and a flat 1% tolerance rejects it, which had the guard refusing the
+    system's own faithful text.
+
+    A figure is accepted when the evidence rounds to it at the precision the
+    text used. That is what a correct rounding means, and it is stricter than
+    the proportional tolerance it replaced, which allowed 8,975 to pass for
+    8,970.60 because the two are within one percent of each other.
+    """
+    return abs(value - candidate) <= 0.5 * (10.0 ** -places)
+
+
 def verify_numbers(text: str, package: dict) -> VerificationResult:
     """Confirm every figure in the text traces back to the evidence package."""
     accepted = known_values(package)
@@ -118,10 +137,8 @@ def verify_numbers(text: str, package: dict) -> VerificationResult:
             continue
 
         checked += 1
-        if any(
-            abs(value - candidate) <= max(RELATIVE_TOLERANCE * abs(candidate), 0.01)
-            for candidate in accepted
-        ):
+        places = _decimals(token)
+        if any(_is_rounded_form_of(value, candidate, places) for candidate in accepted):
             continue
         unsupported.append(token)
 

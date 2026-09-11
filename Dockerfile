@@ -7,7 +7,7 @@
 #   docker build -t rootsignal .
 #   docker run --rm -p 8501:8501 rootsignal          # the dashboard
 #   docker run --rm rootsignal pytest                # verify the claims
-#   docker run --rm rootsignal python scripts/detect_signals.py --current-period 2026-02-16
+#   docker run --rm rootsignal python scripts/detect_signals.py
 
 FROM python:3.12-slim-bookworm
 
