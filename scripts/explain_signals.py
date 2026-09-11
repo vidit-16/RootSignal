@@ -10,11 +10,9 @@ claiming a cause, is discarded.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
-from rootsignal.cleaning import clean_dataset
+from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.explanation import explain, is_available, write_briefing, write_summary
-from rootsignal.ingestion import load_dataset
 from rootsignal.signals import detect_signals
 
 
@@ -37,7 +35,7 @@ def main() -> None:
     parser.add_argument("--base-url", default=None, help="Any OpenAI-compatible endpoint.")
     args = parser.parse_args()
 
-    tables = clean_dataset(load_dataset(Path(args.input_dir))).tables
+    tables = load_tables_for_analysis(args.input_dir)
     signals = detect_signals(
         tables,
         metric=args.metric,

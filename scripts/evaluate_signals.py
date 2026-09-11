@@ -16,8 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from rootsignal.cleaning import clean_dataset
-from rootsignal.ingestion import load_dataset
+from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.signals import evaluate_scenarios, load_scenarios, summarise_evaluation
 
 DETAIL_COLUMNS = [
@@ -39,7 +38,7 @@ def main() -> None:
     parser.add_argument("--output-dir", default=None, help="Optional directory for CSV output.")
     args = parser.parse_args()
 
-    tables = clean_dataset(load_dataset(Path(args.input_dir))).tables
+    tables = load_tables_for_analysis(args.input_dir)
     scenarios = load_scenarios(args.input_dir)
     floors = tuple(part.strip() for part in args.floors.split(",") if part.strip())
 

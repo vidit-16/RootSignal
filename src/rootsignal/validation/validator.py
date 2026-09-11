@@ -132,12 +132,19 @@ class DatasetValidator:
                 )
 
         if "dim_date" in tables and "date" in tables["dim_date"].columns:
-            valid_dates = set(pd.to_datetime(tables["dim_date"]["date"], errors="coerce").dt.date.dropna())
+            # Compared as normalised timestamps on both sides. Going through
+            # .dt.date produces objects that pandas now warns it will stop
+            # matching against datetime64 values, and the warning says the
+            # behaviour "will raise an error in the future" — a date check that
+            # silently stopped resolving would pass every fact row instead.
+            valid_dates = set(
+                pd.to_datetime(tables["dim_date"]["date"], errors="coerce").dropna().dt.normalize()
+            )
             for table in ("fact_sales", "fact_orders", "fact_inventory", "fact_targets", "fact_kam_targets"):
                 frame = tables.get(table)
                 if frame is None or "date" not in frame.columns:
                     continue
-                dates = pd.to_datetime(frame["date"], errors="coerce").dt.date
+                dates = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
                 count = int((dates.notna() & ~dates.isin(valid_dates)).sum())
                 if count:
                     issues.append(ValidationIssue(table, "fk_date", "ERROR", count, "Fact dates do not resolve to dim_date."))

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from rootsignal.cleaning import clean_dataset
+from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.forecasting import (
     build_daily_series,
     compare_against_baseline,
@@ -25,7 +25,6 @@ from rootsignal.forecasting import (
     rolling_origin_evaluate,
     summarise_backtest,
 )
-from rootsignal.ingestion import load_dataset
 
 REPORT_COLUMNS = [
     "model",
@@ -64,7 +63,7 @@ def main() -> None:
     parser.add_argument("--output-dir", default=None, help="Optional directory for CSV output.")
     args = parser.parse_args()
 
-    tables = clean_dataset(load_dataset(Path(args.input_dir))).tables
+    tables = load_tables_for_analysis(args.input_dir)
     daily = build_daily_series(tables["fact_sales"], tables["fact_orders"])
 
     print(

@@ -15,8 +15,7 @@ import argparse
 import json
 from pathlib import Path
 
-from rootsignal.cleaning import clean_dataset
-from rootsignal.ingestion import load_dataset
+from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.signals import detect_signals, explain_signal, signals_to_frame
 
 
@@ -37,7 +36,7 @@ def main() -> None:
     parser.add_argument("--output-dir", default=None, help="Optional directory for a CSV summary.")
     args = parser.parse_args()
 
-    tables = clean_dataset(load_dataset(Path(args.input_dir))).tables
+    tables = load_tables_for_analysis(args.input_dir)
     signals = detect_signals(
         tables,
         metric=args.metric,

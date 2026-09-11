@@ -11,8 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from rootsignal.cleaning import clean_dataset
-from rootsignal.ingestion import load_dataset
+from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.sql import available_queries, build_database, run_query_file
 
 
@@ -33,7 +32,7 @@ def main() -> None:
     if args.query not in names:
         raise SystemExit(f"Unknown query '{args.query}'. Available: {names}")
 
-    tables = clean_dataset(load_dataset(Path(args.input_dir))).tables
+    tables = load_tables_for_analysis(args.input_dir)
     conn = build_database(tables)
     result = run_query_file(conn, args.query)
 

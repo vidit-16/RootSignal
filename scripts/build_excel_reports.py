@@ -7,10 +7,8 @@ Excel is where this system reports, not where it computes.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
-from rootsignal.cleaning import clean_dataset
-from rootsignal.ingestion import load_dataset
+from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.reporting import available_reports, build_all_reports
 
 
@@ -31,7 +29,7 @@ def main() -> None:
         return
 
     names = [part.strip() for part in args.reports.split(",")] if args.reports else None
-    tables = clean_dataset(load_dataset(Path(args.input_dir))).tables
+    tables = load_tables_for_analysis(args.input_dir)
     written = build_all_reports(
         tables,
         output_dir=args.output_dir,

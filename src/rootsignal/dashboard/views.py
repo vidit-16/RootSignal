@@ -25,6 +25,7 @@ from ..analysis import (
     variance_vs_target,
 )
 from ..cleaning import clean_dataset
+from ..dataset import check_contracts
 from ..forecasting import (
     build_daily_series,
     compare_against_baseline,
@@ -48,6 +49,7 @@ def load_business_data(input_dir: str | Path = DEFAULT_INPUT_DIR) -> dict:
     """
     raw = load_dataset(Path(input_dir))
     result = clean_dataset(raw)
+    check_contracts(result.tables, source=str(Path(input_dir)))
     return {
         "tables": result.tables,
         "audit": result.audit,
