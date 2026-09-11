@@ -64,6 +64,7 @@ Power BI is intentionally outside the core project scope.
 | Consolidation | Grain-safe enrichment and the commercial mart | [consolidation.md](docs/consolidation.md) |
 | KPI engine | Deterministic sales, order, fill-rate, mix, growth, and variance metrics | [kpis.md](docs/kpis.md) |
 | Forecasting | Five deterministic daily models with rolling-origin backtesting | [forecasting.md](docs/forecasting.md) |
+| Trend and variance | Day/week/month movement, and variance against prior period, target, and forecast under one schema | [analysis.md](docs/analysis.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
@@ -80,12 +81,18 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
   1 impossible order line, after which validation passes with zero errors.
 - **Reconciliation:** the commercial mart reconciles exactly to cleaned facts on
   net sales, units, ordered units, and fulfilled units.
-- **Tests:** 54 automated tests covering validation, cleaning, KPIs, consolidation,
-  SQL schema conformance, forecasting, and the end-to-end pipeline.
+- **Variance coverage:** plan-versus-actual attainment spans **85.1% to 119.0%**
+  across 64 region/category/channel segments (23 above plan, 41 below), so target
+  variance separates segments instead of failing them uniformly.
+- **Scenario detection:** the seeded supply disruption is detected without being
+  told where to look. Weekly fill rate in the affected Bengaluru segments falls
+  from 0.99 to 0.69 and crosses from above target to **0.227 below** it.
+- **Tests:** 80 automated tests covering validation, cleaning, KPIs, consolidation,
+  SQL schema conformance, forecasting, trend and variance analysis, and the
+  end-to-end pipeline.
 
 ### Not yet built
 
-Trend and variance engines, driver decomposition, root-cause signals, impact
-estimation, confidence scoring, the optional LLM explanation layer, the
-Streamlit dashboard, Excel reporting, SQL marts and analytics queries, database
-ingestion, and Docker.
+Driver decomposition, root-cause signals, impact estimation, confidence scoring,
+the optional LLM explanation layer, the Streamlit dashboard, Excel reporting,
+SQL marts and analytics queries, database ingestion, and Docker.

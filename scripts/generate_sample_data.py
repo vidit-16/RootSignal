@@ -253,6 +253,7 @@ def build_inventory_and_targets(
     rng: np.random.Generator,
     dimensions: dict[str, pd.DataFrame],
     orders_df: pd.DataFrame,
+    sales_df: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     inventory_rows: list[list[object]] = []
     dates = dimensions["dim_date"]["date"].tolist()
@@ -318,20 +319,59 @@ def build_inventory_and_targets(
         ],
     )
 
+    # Targets are a plan, so they are anchored to the demand the business
+    # actually sees rather than to a flat constant. A target unrelated to
+    # realised volume makes every segment miss by the same implausible margin
+    # and leaves plan-versus-actual variance carrying no information.
+    #
+    # Each segment also carries a persistent plan bias, so some segments run
+    # ahead of plan and others fall behind. That spread is what makes variance
+    # analysis worth running at all.
+    segment_keys = ["region_code", "category", "channel"]
+    sku_category = sku_df.set_index("sku_id")["category"]
+    orders_by_segment = orders_df.assign(category=orders_df["sku_id"].map(sku_category))
+
+    # Divide by every day in the range, not by the days a segment happened to
+    # trade on. At this grain many segments are idle on any given day, and
+    # averaging over only their active days would set a plan well above the
+    # volume they actually deliver across the period.
+    day_count = len(dates)
+    sales_baseline = sales_df.groupby(segment_keys)["net_sales"].sum() / day_count
+    order_baseline = orders_by_segment.groupby(segment_keys)["order_id"].nunique() / day_count
+    plan_bias = dict(
+        zip(sales_baseline.index, rng.normal(1.0, 0.07, size=len(sales_baseline)))
+    )
+
     target_rows: list[list[object]] = []
     for current_date in dates:
+        weekday_uplift = 1.08 if current_date.weekday() in (4, 5) else 1.0
         for region_code, _, _ in REGIONS:
             for category in CATEGORIES:
-                sales_target = round(
-                    15000
-                    * (1 + (0.08 if current_date.weekday() in (4, 5) else 0))
-                    * (1 + rng.uniform(-0.04, 0.04)),
-                    2,
-                )
-                order_target = int(80 * (1 + rng.uniform(-0.05, 0.05)))
-                target_rows.append(
-                    [current_date, region_code, category, "ALL", sales_target, order_target, 0.93]
-                )
+                for channel in CHANNELS:
+                    key = (region_code, category, channel)
+                    bias = float(plan_bias.get(key, 1.0))
+                    sales_target = round(
+                        float(sales_baseline.get(key, 0.0))
+                        * bias
+                        * weekday_uplift
+                        * (1 + rng.uniform(-0.04, 0.04)),
+                        2,
+                    )
+                    order_target = max(
+                        1,
+                        int(round(float(order_baseline.get(key, 0.0)) * bias * weekday_uplift)),
+                    )
+                    target_rows.append(
+                        [
+                            current_date,
+                            region_code,
+                            category,
+                            channel,
+                            sales_target,
+                            order_target,
+                            0.93,
+                        ]
+                    )
 
     targets_df = pd.DataFrame(
         target_rows,
@@ -369,7 +409,7 @@ def write_dataset(output_dir: Path) -> dict[str, object]:
 
     dimensions = build_dimensions(rng)
     sales_df, orders_df = build_transactions(rng, dimensions)
-    inventory_df, targets_df = build_inventory_and_targets(rng, dimensions, orders_df)
+    inventory_df, targets_df = build_inventory_and_targets(rng, dimensions, orders_df, sales_df)
     sales_raw, orders_raw = add_controlled_quality_issues(sales_df, orders_df)
 
     tables = {

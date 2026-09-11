@@ -123,9 +123,30 @@ def build_commercial_mart(
     if "sales_type" not in required_grain:
         raise ValueError("Commercial mart grain must include 'sales_type'.")
 
-    sales = enrich_sales(tables)
-    orders = enrich_orders(tables)
+    return aggregate_commercial_metrics(
+        enrich_sales(tables), enrich_orders(tables), grain_columns
+    )
 
+
+def aggregate_commercial_metrics(
+    sales: pd.DataFrame,
+    orders: pd.DataFrame,
+    grain_columns: list[str],
+) -> pd.DataFrame:
+    """Reduce enriched sales and order facts to one grain and merge them.
+
+    Each fact is aggregated independently before the merge, so an order
+    spanning several SKU lines contributes one order at the target grain
+    rather than one per line.
+
+    Ratios are recomputed from the summed components rather than carried up
+    from a finer grain. Averaging a daily fill rate into a weekly one would
+    weight every day equally regardless of the demand behind it.
+
+    Shared by the daily commercial mart and by period-level trend analysis, so
+    both describe these metrics with a single definition.
+    """
+    grain_columns = list(grain_columns)
     _require_columns(
         sales,
         [*grain_columns, "order_id", "units", "unit_price", "net_sales"],
