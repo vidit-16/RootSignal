@@ -32,9 +32,9 @@ sample range runs 2026-01-01 (a Thursday) to 2026-03-01, so:
 
 Comparing those against full periods reports a change in calendar coverage as
 though it were a change in trade. Concretely, including the partial first week
-produces a **+78.7% week-over-week surge** into week two. Nothing surged; the
+produces a **+60.6% week-over-week surge** into week two. Nothing surged; the
 first week was simply short. With partial periods excluded, real weekly
-movement runs between −7.2% and +11.9%.
+movement runs between −6.0% and +8.5%.
 
 Every period is therefore labelled complete or partial. Completeness is judged
 against the calendar, not against how many rows are present, so a genuine
@@ -150,7 +150,7 @@ target comparison would have silently matched nothing.
 
 Targets are now anchored to each segment's realised daily volume, with a
 persistent per-segment plan bias, and carry real channels. Segment attainment
-spans **85.5% to 119.8%** (median 97.7%) — 25 segments above plan and 39 below.
+spans **82.1% to 115.6%** (median 97.8%) — 27 segments above plan and 37 below.
 That spread is what makes plan-versus-actual analysis worth running.
 
 This changed `fact_targets` from 960 to 3,840 rows.
@@ -161,7 +161,7 @@ This changed `fact_targets` from 960 to 3,840 rows.
 a deliberately separate table. A key account manager owns a portfolio of
 customers rather than a region or a category, so pushing the quota into the
 region/category/channel grain would leave most combinations empty. Attainment
-across the four managers runs **93.4% to 97.4%**.
+across the four managers runs **93.0% to 110.0%**.
 
 Attributing orders to a manager requires `kam_id` on the order fact, which comes
 from the customer master rather than from the order line. The join is
@@ -173,21 +173,21 @@ test asserts that ordered units and order counts are unchanged by it.
 From 2026-02-18 the Bengaluru fruit and vegetable segments fulfil a much smaller
 share of demand. Weekly fill rate for BLR Fruits:
 
-| Week of | Fill rate | Change |
+| Week of | Ordered units | Fill rate |
 | --- | --- | --- |
-| 2026-02-02 | 0.985 | +0.091 |
-| 2026-02-09 | 0.964 | −0.021 |
-| 2026-02-16 | 0.761 | **−0.203** |
-| 2026-02-23 | 0.671 | **−0.090** |
+| 2026-02-02 | 138 | 0.971 |
+| 2026-02-09 | 180 | 0.972 |
+| 2026-02-16 | 143 | **0.783** |
+| 2026-02-23 | 169 | **0.704** |
 
-Against the 0.93 service-level target, BLR Vegetables ran between +0.003 and
-+0.070 **above** target through 2026-02-09, then fell to −0.149 and −0.198.
+The constraint begins on a Wednesday, so the week starting 02-16 carries only
+five affected days. Comparing a fully affected week (02-23) against a clean one
+(02-09) shows fulfilled units falling 32% while ordered units fell 6%: the fill
+rate collapsed because fulfilment dropped far faster than the order book did.
 
-Demand did not go with it. Over the same window the affected segments took
-**more** orders per day, not fewer (10.96 to 12.00) and ordered units rose from
-47.3 to 50.3 per day, while fulfilled units fell from 45.2 to 34.7. Daily order
-volume varies in this dataset, so a demand collapse was expressible and simply
-did not occur — which is what separates a supply signal from a demand signal.
+**A falling fill rate is arithmetic proof that fulfilment lagged demand.** The
+ratio cannot fall unless fulfilled units fell by more than ordered units did, so
+a modest demand dip alongside a large fill-rate drop remains a fulfilment story.
 
 This is evidence that fulfilment deteriorated in a specific segment at a
 specific time. It is **not** a statement of cause. Establishing whether supply,

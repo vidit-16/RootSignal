@@ -57,7 +57,7 @@ Power BI is intentionally outside the core project scope.
 | Layer | What it does | Docs |
 | --- | --- | --- |
 | Data model + SQL schema | Dimensions and facts with grains and composite keys enforced in both SQL and Python | [data_model.md](docs/data_model.md) |
-| Sample-data generator | Deterministic 60-day dataset (seed 42) with controlled quality defects | — |
+| Sample-data generator | Deterministic 60-day dataset (seed 42) with multi-SKU baskets, controlled quality defects, and four labelled scenarios | — |
 | Ingestion | CSV and Excel loading by table name | — |
 | Validation | Columns, keys, ranges, referential integrity, cross-table reconciliation | — |
 | Cleaning | Quarantine-first repair with a full audit trail | [cleaning.md](docs/cleaning.md) |
@@ -68,6 +68,7 @@ Power BI is intentionally outside the core project scope.
 | Driver decomposition | Exact attribution of a movement to segments, with rate/mix separation for ratios | [decomposition.md](docs/decomposition.md) |
 | Impact estimation | Fulfilment shortfall valued at realised prices, with every assumption stated | [signals.md](docs/signals.md) |
 | RootSignal engine | Evidence, pattern, impact, confidence and recommended investigation, ranked | [signals.md](docs/signals.md) |
+| Scenario evaluation | Measures whether the engine tells four planted situations apart | [signals.md](docs/signals.md) |
 | SQL layer | Staging views, commercial mart and seven business queries, all executed by tests | [sql.md](docs/sql.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
@@ -75,48 +76,40 @@ Power BI is intentionally outside the core project scope.
 
 Numbers below come from the committed test suite and evaluation scripts, not from estimates.
 
+- **Scenario detection:** the dataset carries four deliberately different
+  situations — a supply constraint, a demand decline, a mix shift, and a region
+  where nothing happens. The engine **correctly classifies all three planted
+  situations** at a medium confidence floor, or **two of three with zero false
+  alarms and complete silence on the control** at a high floor. Ground truth
+  travels with the data; reproduce with `python scripts/evaluate_signals.py`.
+- **End-to-end signal quality:** given only a fill-rate movement across every
+  region and category, with nothing naming Bengaluru, Fruits or supply, the top
+  signal is **BLR Fruits** — a fulfilment constraint at high confidence, an
+  estimated impact of **8,325**, and a concrete recommended investigation. It
+  scores 5 of 6 criteria rather than 6, because demand also softened and the
+  engine refuses to dismiss that alternative.
 - **Forecast accuracy:** `seasonal_mean_7` reduces WAPE against a naive baseline
-  by **32.2%** on daily net sales, **36.0%** on units, and **35.2%** on order
-  volume (rolling-origin backtest, horizon 7, 4 folds, 28 scored observations).
-  It has the best mean rank across all three metrics and six backtest
-  configurations; the most conservative improvement measured in any of them is
-  +21.0%. Reproduce with `python scripts/evaluate_forecasts.py`.
+  by **27.1%** on daily net sales and **11.4%** on units, ranking first in all six
+  backtest configurations tested (range +8.3% to +43.4%). On order volume the
+  level-tracking `ses` leads at **+22.2%**. Reproduce with
+  `python scripts/evaluate_forecasts.py`.
+- **SQL/Python parity:** the commercial mart is implemented twice, in Python and
+  in SQL, and a test asserts the two agree **row for row across 3,663 rows and
+  eleven metric columns**. Separately, the SQL supply watchlist and the Python
+  signal engine — which share no code — independently return the same two
+  disrupted segments.
 - **Data quality:** validation detects **8 errors** across the 10 raw tables. Cleaning
   imputes 3 recoverable fields, removes 2 exact duplicates, and quarantines
   1 impossible order line, after which validation passes with zero errors.
 - **Reconciliation:** the commercial mart reconciles exactly to cleaned facts on
   net sales, units, ordered units, and fulfilled units.
-- **Variance coverage:** plan-versus-actual attainment spans **85.5% to 119.8%**
-  across 64 region/category/channel segments (25 above plan, 39 below), so target
-  variance separates segments instead of failing them uniformly. KAM quota
-  attainment runs 93.4% to 97.4% across the four key account managers.
-- **Scenario detection:** the seeded supply disruption is found without being told
-  where to look. Weekly fill rate in the affected Bengaluru segments falls from
-  0.96 to 0.67 and crosses from above the service target to **0.198 below** it —
-  while order volume in those same segments *rose* 9.5% and ordered units rose
-  6.3%. Demand could have fallen and did not, which is what makes this a supply
-  signal rather than a demand signal.
-- **Attribution accuracy:** driver decomposition locates the seeded supply
-  disruption unaided. Given only a fill-rate movement across every region and
-  category, it ranks **BLR Fruits and BLR Vegetables first and second** without
-  either being named as an input. Contributions reconstruct the observed movement
-  exactly, for additive metrics and for rates.
-- **End-to-end signal detection:** given only a fill-rate movement across every
-  region and category, with nothing naming Bengaluru, Fruits or supply, the engine
-  returns **BLR Fruits** as its top signal: a fulfilment constraint at **high
-  confidence (6 of 6 criteria)**, an estimated impact of **9,174**, and a concrete
-  recommended investigation. A second segment on the same run is classified as
-  demand softness instead, so the classifier discriminates rather than labelling
-  everything a supply problem. Reproduce with `python scripts/detect_signals.py`.
-- **SQL/Python parity:** the commercial mart is implemented twice, in Python and
-  in SQL, and a test asserts the two agree **row for row across 3,109 rows and
-  eleven metric columns**. Separately, the SQL supply watchlist and the Python
-  signal engine — which share no code — independently return the same two
-  disrupted segments.
-- **Tests:** 159 automated tests covering validation, cleaning, KPIs, consolidation,
+- **Variance coverage:** plan-versus-actual attainment spans **82.1% to 115.6%**
+  across 64 region/category/channel segments (27 above plan, 37 below). KAM quota
+  attainment runs 93.0% to 110.0% across the four key account managers.
+- **Tests:** 165 automated tests covering validation, cleaning, KPIs, consolidation,
   SQL schema conformance and parity, forecasting, trend and variance analysis,
-  driver decomposition, impact estimation, signal assembly, and the end-to-end
-  pipeline. One asserts that no signal output ever claims causation.
+  driver decomposition, impact estimation, signal assembly, and scenario
+  evaluation. One asserts that no signal output ever claims causation.
 
 ### Not yet built
 

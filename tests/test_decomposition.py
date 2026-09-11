@@ -291,27 +291,38 @@ def test_decomposition_finds_the_disrupted_segments_without_being_told(cleaned_d
     assert leading == {"BLR | Fruits", "BLR | Vegetables"}
 
 
-def test_ranking_a_rate_by_total_contribution_would_hide_the_disruption(cleaned_dataset) -> None:
-    """Evidence for why rate movements are ranked on their dominant component.
+def test_ranking_a_rate_by_total_contribution_can_hide_a_collapse() -> None:
+    """Why rate movements are ranked on their dominant component.
 
-    BLR Fruits fulfils far less of its demand than before, yet its total
-    contribution is positive because demand moved away from it at the same time.
-    Ranked on the total it looks like a segment that helped.
+    A segment whose fill rate collapses can still show a *positive* total
+    contribution, if demand grew into it at the same time. Ranked on the total
+    it reads as a segment that helped, and the collapse never surfaces.
+
+    This is asserted on a constructed case rather than on the sample data: which
+    real segment happens to exhibit it depends on that week's demand mix, and a
+    property this important should not be tested only when the data obliges.
     """
-    weekly = summarise_by_period(
-        cleaned_dataset.tables, period="week", group_by=["region_code", "category"]
+    frame = summary(
+        [
+            # Fill rate 0.96, holding a tenth of demand.
+            {"period_start": WEEK_1, "region_code": "FAILING", "fulfilled_units": 96.0, "ordered_units": 100.0},
+            {"period_start": WEEK_1, "region_code": "STEADY", "fulfilled_units": 855.0, "ordered_units": 900.0},
+            # Fill rate collapses to 0.76 while demand grows into the segment.
+            {"period_start": WEEK_2, "region_code": "FAILING", "fulfilled_units": 114.0, "ordered_units": 150.0},
+            {"period_start": WEEK_2, "region_code": "STEADY", "fulfilled_units": 807.5, "ordered_units": 850.0},
+        ]
     )
-    result = decompose_rate(
-        weekly, "fill_rate", ["region_code", "category"],
-        current_period="2026-02-16", comparison_period="2026-02-09",
-    )
-    blr_fruits = result[result["segment"] == "BLR | Fruits"].iloc[0]
+    result = decompose_rate(frame, "fill_rate", ["region_code"])
+    failing = result[result["segment"] == "FAILING"].iloc[0]
 
-    assert blr_fruits["rate_effect"] < 0  # fulfilment genuinely deteriorated
-    assert blr_fruits["contribution"] > 0  # yet the total reads as positive
+    assert failing["rate_effect"] < 0  # fulfilment genuinely deteriorated
+    assert failing["contribution"] > 0  # yet the total reads as positive
 
-    ranked_by_total = rank_drivers(result, direction="negative", top_n=3)
-    assert "BLR | Fruits" not in set(ranked_by_total["segment"])
+    ranked_by_total = rank_drivers(result, direction="negative", top_n=2)
+    assert "FAILING" not in set(ranked_by_total["segment"])
+
+    ranked_by_rate = rank_drivers(result, direction="negative", top_n=1, by="rate_effect")
+    assert ranked_by_rate.iloc[0]["segment"] == "FAILING"
 
 
 def test_mix_effect_is_incoherent_noise_in_the_real_movement(cleaned_dataset) -> None:

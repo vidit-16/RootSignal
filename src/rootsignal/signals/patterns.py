@@ -71,7 +71,13 @@ def _fulfilment_lagged_demand(evidence: dict[str, dict]) -> bool:
     """
     if _direction(evidence, "fill_rate") == "down":
         return True
-    return _direction(evidence, "fulfilled_units") == "down"
+    # Falling shipments on their own prove nothing. A segment that ships less
+    # because less was asked of it is serving its demand perfectly well, and
+    # its fill rate says so. Shipments falling only indicate a constraint when
+    # the order book did not fall with them.
+    return _direction(evidence, "fulfilled_units") == "down" and _direction(
+        evidence, "ordered_units"
+    ) in ("up", "flat")
 
 
 def classify(
@@ -114,7 +120,13 @@ def classify(
         )
 
     demand_held = demand in ("up", "flat")
-    if demand_held and _fulfilment_lagged_demand(evidence):
+    # A falling fill rate is arithmetic proof that fulfilment lagged demand:
+    # the ratio cannot fall unless fulfilled units fell by more than ordered
+    # units did. So a modest demand dip alongside a large fill-rate drop is
+    # still a fulfilment story, and requiring demand to have held would
+    # misread it as weak demand. Demand softness is reserved below for the
+    # case where fulfilment tracked demand down and the ratio held.
+    if _fulfilment_lagged_demand(evidence):
         if fulfilled == "down":
             corroborating.append(f"fulfilled units fell{_pct(evidence, 'fulfilled_units')}")
             shape = "fulfilled units fell while ordered units did not"
@@ -123,18 +135,31 @@ def classify(
                 f"fulfilment grew more slowly than demand{_pct(evidence, 'fulfilled_units')}"
             )
             shape = "fulfilment did not keep pace with the demand placed on it"
-        corroborating.append(
-            f"ordered units {'rose' if demand == 'up' else 'held'}{_pct(evidence, 'ordered_units')}"
-        )
+        if demand_held:
+            corroborating.append(
+                f"ordered units {'rose' if demand == 'up' else 'held'}"
+                f"{_pct(evidence, 'ordered_units')}"
+            )
+            supply_note = (
+                "Demand did not weaken over this period, so a demand-led explanation "
+                "is not supported by the order volumes."
+            )
+        else:
+            # Demand softened too, but by less than fulfilment did, which is why
+            # the ratio fell. Both readings are live and the note says so.
+            corroborating.append(
+                f"fulfilment fell faster than demand{_pct(evidence, 'ordered_units')} in orders"
+            )
+            supply_note = (
+                "Demand also softened over this period, so a demand-led explanation "
+                "cannot be dismissed. It does not account for the movement on its "
+                "own: the fill rate fell, which means fulfilment dropped by more "
+                "than the order book did."
+            )
         if stock == "down":
             corroborating.append(f"available stock fell{_pct(evidence, 'available_stock')}")
         if stockouts == "up":
             corroborating.append("stockout rate rose")
-
-        supply_note = (
-            "Demand did not weaken over this period, so a demand-led explanation "
-            "is not supported by the order volumes."
-        )
         return PatternAssessment(
             pattern=FULFILMENT_CONSTRAINT,
             statement=(
@@ -142,7 +167,7 @@ def classify(
                 f"constraint: {shape}."
             ),
             alternative_hypothesis="Demand weakened and the fall in fulfilment simply followed it.",
-            alternative_supported=False,
+            alternative_supported=not demand_held,
             alternative_note=supply_note,
             recommended_investigation=(
                 f"Review inventory availability and replenishment for {segment}, "

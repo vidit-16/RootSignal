@@ -25,6 +25,97 @@ START_DATE = date(2026, 1, 1)
 N_DAYS = 60
 BASE_DAILY_ORDERS = 80
 
+# Orders carry several SKU lines, weighted toward small baskets. A single line
+# per order would make order_id unique across both facts, so COUNT(order_id) and
+# COUNT(DISTINCT order_id) would agree everywhere and every guard against
+# double-counting a multi-SKU order would be unfalsifiable on this data.
+BASKET_SIZE_CHOICES = (1, 2, 3)
+BASKET_SIZE_WEIGHTS = (0.62, 0.26, 0.12)
+MEAN_BASKET_LINES = sum(
+    size * weight for size, weight in zip(BASKET_SIZE_CHOICES, BASKET_SIZE_WEIGHTS)
+)
+
+# --- Planted scenarios ---------------------------------------------------
+# The dataset carries four deliberately different situations. Measuring the
+# signal engine against a single planted event only shows that it finds what it
+# was pointed at; measuring it against several shows whether it tells them
+# apart, which is the claim actually worth making.
+SUPPLY_CONSTRAINT_START = date(2026, 2, 18)
+SUPPLY_CONSTRAINT_REGION = "BLR"
+SUPPLY_CONSTRAINT_CATEGORIES = ("Fruits", "Vegetables")
+
+DEMAND_SOFTNESS_START = date(2026, 2, 4)
+DEMAND_SOFTNESS_REGION = "HYD"
+DEMAND_SOFTNESS_CATEGORIES = ("Premium",)
+
+MIX_SHIFT_START = date(2026, 1, 26)
+MIX_SHIFT_REGION = "DEL"
+MIX_SHIFT_TOWARD = "Premium"
+
+CONTROL_REGION = "MUM"
+
+SCENARIOS = [
+    {
+        "name": "blr_supply_constraint",
+        "region_code": SUPPLY_CONSTRAINT_REGION,
+        "categories": list(SUPPLY_CONSTRAINT_CATEGORIES),
+        "starts": str(SUPPLY_CONSTRAINT_START),
+        "expected_pattern": "fulfilment_constraint",
+        "metric": "fill_rate",
+        "current_period": "2026-02-23",
+        "comparison_period": "2026-02-09",
+        "description": (
+            "Fulfilment and stock deteriorate while demand holds or grows. The "
+            "segments cannot serve the orders they are receiving."
+        ),
+    },
+    {
+        "name": "hyd_demand_softness",
+        "region_code": DEMAND_SOFTNESS_REGION,
+        "categories": list(DEMAND_SOFTNESS_CATEGORIES),
+        "starts": str(DEMAND_SOFTNESS_START),
+        "expected_pattern": "demand_softness",
+        "metric": "ordered_units",
+        "current_period": "2026-02-09",
+        "comparison_period": "2026-01-26",
+        "description": (
+            "Ordered volume falls away while fulfilment and stock stay healthy. "
+            "The segment is asked for less, and serves what it is asked for."
+        ),
+    },
+    {
+        "name": "del_mix_shift",
+        "region_code": MIX_SHIFT_REGION,
+        # Left open deliberately. A shift of demand toward one category shows up
+        # on the categories *losing* share, which carry the negative mix effect,
+        # not on the one gaining it. Naming the gaining category here would ask
+        # the engine to surface it in a ranking of negative movements, where it
+        # correctly does not appear.
+        "categories": [],
+        "starts": str(MIX_SHIFT_START),
+        "expected_pattern": "portfolio_mix_shift",
+        "metric": "fill_rate",
+        "current_period": "2026-02-02",
+        "comparison_period": "2026-01-19",
+        "description": (
+            "Demand tilts toward a category this region has always fulfilled "
+            "less well. No segment's own fill rate changes; the regional total "
+            "falls because the blend moved."
+        ),
+    },
+    {
+        "name": "mum_control",
+        "region_code": CONTROL_REGION,
+        "categories": [],
+        "starts": None,
+        "expected_pattern": None,
+        "metric": "fill_rate",
+        "current_period": "2026-01-19",
+        "comparison_period": "2026-01-12",
+        "description": "Nothing is planted here. Signals raised are false positives.",
+    },
+]
+
 REGIONS = [
     ("BLR", "Bengaluru", "South"),
     ("MUM", "Mumbai", "West"),
@@ -124,6 +215,68 @@ def build_dimensions(rng: np.random.Generator) -> dict[str, pd.DataFrame]:
     }
 
 
+def _pick_skus(
+    rng: np.random.Generator,
+    sku_df: pd.DataFrame,
+    region_code: str,
+    current_date: date,
+    count: int,
+) -> pd.DataFrame:
+    """Choose the distinct SKUs on one order.
+
+    In the mix-shift region, demand tilts toward a category that region has
+    always fulfilled less well. Nothing about how well any segment fulfils
+    changes; only the blend of what is ordered does.
+    """
+    weights = np.ones(len(sku_df))
+    if region_code == MIX_SHIFT_REGION and current_date >= MIX_SHIFT_START:
+        weights = np.where(sku_df["category"].to_numpy() == MIX_SHIFT_TOWARD, 3.2, 1.0)
+    weights = weights / weights.sum()
+    chosen = rng.choice(len(sku_df), size=min(count, len(sku_df)), replace=False, p=weights)
+    return sku_df.iloc[chosen]
+
+
+def _fulfilment_ratio(rng: np.random.Generator, region_code: str, category: str, current_date: date) -> float:
+    """How much of a line's demand gets served.
+
+    The supply constraint is an event with a start date. The mix-shift region's
+    weaker category is structural and present from day one, so a movement there
+    cannot be mistaken for something that happened.
+    """
+    if (
+        region_code == SUPPLY_CONSTRAINT_REGION
+        and category in SUPPLY_CONSTRAINT_CATEGORIES
+        and current_date >= SUPPLY_CONSTRAINT_START
+    ):
+        return float(rng.uniform(0.62, 0.82))
+    if region_code == MIX_SHIFT_REGION and category == MIX_SHIFT_TOWARD:
+        return float(rng.uniform(0.78, 0.86))
+    return float(rng.uniform(0.90, 0.99))
+
+
+def _demand_lambda(
+    channel: str,
+    basket_seasonal: float,
+    region_code: str,
+    category: str,
+    current_date: date,
+) -> float:
+    """Expected units on a line, before the scenarios are applied.
+
+    Divided by the mean basket size so that adding lines to an order does not
+    silently inflate the business.
+    """
+    base = (5.4 if channel == "Modern Trade" else 3.3) / MEAN_BASKET_LINES
+    lam = base * basket_seasonal
+    if (
+        region_code == DEMAND_SOFTNESS_REGION
+        and category in DEMAND_SOFTNESS_CATEGORIES
+        and current_date >= DEMAND_SOFTNESS_START
+    ):
+        lam *= 0.5
+    return lam
+
+
 def build_transactions(
     rng: np.random.Generator,
     dimensions: dict[str, pd.DataFrame],
@@ -152,76 +305,77 @@ def build_transactions(
 
         for _ in range(daily_orders):
             order_counter += 1
+            order_id = f"O{order_counter}"
             customer = customer_df.iloc[random.randrange(len(customer_df))]
-            sku = sku_df.iloc[random.randrange(len(sku_df))]
+            region_code = customer["region_code"]
 
-            shock = (
-                current_date >= date(2026, 2, 18)
-                and customer["region_code"] == "BLR"
-                and sku["category"] in ("Fruits", "Vegetables")
-            )
-
-            lam = (5.4 if customer["channel"] == "Modern Trade" else 3.3) * basket_seasonal
-            ordered_units = max(1, int(rng.poisson(lam)))
-            fulfillment_ratio = (
-                rng.uniform(0.90, 0.99) if not shock else rng.uniform(0.62, 0.82)
-            )
-
+            # Order-level attributes are decided once and shared by every line,
+            # which is what makes the order the unit that must not be counted
+            # more than once downstream.
             status = "Cancelled" if rng.random() < 0.025 else "Completed"
-            fulfilled_units = (
-                max(0, round(ordered_units * fulfillment_ratio))
-                if status != "Cancelled"
-                else 0
-            )
-            cancelled_units = (
-                ordered_units - fulfilled_units if status != "Cancelled" else ordered_units
-            )
-
-            unit_price = float(sku["list_price"] * rng.uniform(0.93, 1.02))
-            discount_pct = float(rng.uniform(0, 0.12))
-            net_sales = fulfilled_units * unit_price * (1 - discount_pct)
             sales_type = (
                 "PRIMARY"
                 if customer["customer_type"] in ("Distributor", "Retail Chain")
                 and rng.random() < 0.45
                 else "SECONDARY"
             )
-            order_id = f"O{order_counter}"
 
-            order_rows.append(
-                [
-                    order_id,
-                    current_date,
-                    customer["customer_id"],
-                    customer["region_code"],
-                    customer["channel"],
-                    sku["sku_id"],
-                    ordered_units,
-                    fulfilled_units,
-                    cancelled_units,
-                    status,
-                    sales_type,
-                ]
-            )
+            basket_size = int(rng.choice(BASKET_SIZE_CHOICES, p=BASKET_SIZE_WEIGHTS))
+            for _, sku in _pick_skus(rng, sku_df, region_code, current_date, basket_size).iterrows():
+                category = sku["category"]
+                lam = _demand_lambda(
+                    customer["channel"], basket_seasonal, region_code, category, current_date
+                )
+                ordered_units = max(1, int(rng.poisson(lam)))
+                fulfillment_ratio = _fulfilment_ratio(rng, region_code, category, current_date)
 
-            if fulfilled_units > 0:
-                sales_rows.append(
+                fulfilled_units = (
+                    max(0, round(ordered_units * fulfillment_ratio))
+                    if status != "Cancelled"
+                    else 0
+                )
+                cancelled_units = (
+                    ordered_units - fulfilled_units if status != "Cancelled" else ordered_units
+                )
+
+                unit_price = float(sku["list_price"] * rng.uniform(0.93, 1.02))
+                discount_pct = float(rng.uniform(0, 0.12))
+                net_sales = fulfilled_units * unit_price * (1 - discount_pct)
+
+                order_rows.append(
                     [
                         order_id,
                         current_date,
                         customer["customer_id"],
-                        customer["region_code"],
+                        region_code,
                         customer["channel"],
-                        customer["kam_id"],
                         sku["sku_id"],
-                        sku["category"],
-                        sales_type,
+                        ordered_units,
                         fulfilled_units,
-                        round(unit_price, 2),
-                        round(discount_pct, 4),
-                        round(net_sales, 2),
+                        cancelled_units,
+                        status,
+                        sales_type,
                     ]
                 )
+
+                if fulfilled_units > 0:
+                    sales_rows.append(
+                        [
+                            order_id,
+                            current_date,
+                            customer["customer_id"],
+                            region_code,
+                            customer["channel"],
+                            customer["kam_id"],
+                            sku["sku_id"],
+                            category,
+                            sales_type,
+                            fulfilled_units,
+                            round(unit_price, 2),
+                            round(discount_pct, 4),
+                            round(net_sales, 2),
+                        ]
+                    )
 
     sales_df = pd.DataFrame(
         sales_rows,
@@ -241,7 +395,7 @@ def build_transactions(
             "net_sales",
         ],
     )
-    orders_df = pd.DataFrame(
+    order_df = pd.DataFrame(
         order_rows,
         columns=[
             "order_id",
@@ -257,7 +411,7 @@ def build_transactions(
             "sales_type",
         ],
     )
-    return sales_df, orders_df
+    return sales_df, order_df
 
 
 def build_inventory_and_targets(
@@ -274,9 +428,9 @@ def build_inventory_and_targets(
         for region_code, _, _ in REGIONS:
             for _, sku in sku_df.iterrows():
                 shock = (
-                    current_date >= date(2026, 2, 18)
-                    and region_code == "BLR"
-                    and sku["category"] in ("Fruits", "Vegetables")
+                    current_date >= SUPPLY_CONSTRAINT_START
+                    and region_code == SUPPLY_CONSTRAINT_REGION
+                    and sku["category"] in SUPPLY_CONSTRAINT_CATEGORIES
                 )
 
                 base_stock = 35 if sku["sub_category"] == "Standard" else 22
@@ -492,6 +646,7 @@ def write_dataset(output_dir: Path) -> dict[str, object]:
         "seed": SEED,
         "date_range": [str(START_DATE), str(START_DATE + timedelta(days=N_DAYS - 1))],
         "tables": row_counts,
+        "scenarios": SCENARIOS,
         "controlled_quality_issues": {
             "fact_sales_duplicate_rows": 2,
             "fact_sales_missing_discount_pct": 1,

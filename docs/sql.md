@@ -23,7 +23,7 @@ the SQL is reachable from Python, from tests, and from the dashboard.
 
 The commercial mart exists in Python (`build_commercial_mart`) and in SQL
 (`mart_commercial_daily`). **A test asserts they agree row for row**, across
-3,109 rows and eleven metric columns, to within 1e-9.
+3,663 rows and eleven metric columns, to within 1e-9.
 
 This is the guarantee that matters. Without it, a fill rate quoted from a
 dashboard could disagree with one quoted from a query, and neither would be
@@ -38,13 +38,26 @@ on a half-cent therefore differs by 0.01, in either direction, on about 5% of
 rows. The calculation is identical and only the display tie-break differs, so
 the test asserts the thing that matters at the precision that matters.
 
-### Multi-SKU orders need their own fixture
+### Multi-SKU orders, and a bug they exposed
 
-The generated data puts a single SKU on every order, so `COUNT(order_id)` and
-`COUNT(DISTINCT order_id)` return the same number on it. A distinct-count
-regression in the mart would pass unnoticed on the real dataset — and did, when
-first tested. Three tests therefore load a small synthetic dataset whose single
-order spans two SKUs, so the protection is genuinely exercised.
+Orders are baskets: 4,846 orders carry 7,329 lines, and **38.9% span more than
+one SKU**. That was not always so, and the change immediately found a real
+double-counting bug.
+
+`daily_sales_tracker` computed the day's order count as `SUM(order_count)` over
+the mart. The mart splits by category, so a basket holding a fruit and a
+vegetable is one order sitting in two cells: correct within each cell,
+double-counted the moment they are added. On single-SKU data the sum and the
+true count agreed exactly and the bug was invisible. With baskets it reported
+6,667 orders against an actual 4,846. The daily figure is now a distinct count
+taken from the order fact.
+
+**Order counts are not additive across a grain that splits orders.** Units and
+sales are; counts of a thing that spans cells are not.
+
+Three tests still load a small synthetic basket dataset as well, so the
+`COUNT(DISTINCT order_id)` guard is exercised deterministically rather than
+only when the generated data happens to oblige.
 
 ## Staging
 

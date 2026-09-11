@@ -69,22 +69,16 @@ demand entering or leaving actually is.
 
 ## Ranking a rate on the wrong column hides the answer
 
-This is not hypothetical. In the sample data, at the week the seeded supply
-disruption begins:
-
-| Segment | Fill rate before | after | Rate effect | Mix effect | **Total contribution** |
-| --- | --- | --- | --- | --- | --- |
-| BLR \| Fruits | 0.9641 | 0.7609 | **−0.0141** | +0.0229 | **+0.0040** |
-| BLR \| Vegetables | 1.0000 | 0.7808 | **−0.0115** | +0.0064 | −0.0065 |
-
-**BLR Fruits fulfils 20 points less of its demand than the week before, and its
-total contribution is positive.** Demand moved away from it at the same time, and
-the mix effect more than cancels the rate effect. Ranked on total contribution
-it does not appear among the worst segments at all — it looks like a segment
-that helped.
+A segment whose fill rate collapses can still show a **positive** total
+contribution, if demand grew into it while it was failing. Ranked on the total
+it reads as a segment that helped, and the collapse never surfaces at all.
 
 `explain_movement` therefore ranks on whichever component actually carries the
 movement, via `dominant_component`, rather than defaulting to the total.
+`tests/test_decomposition.py` asserts the property on a constructed case rather
+than on the sample data: which real segment exhibits it depends on that week's
+demand mix, and a property this important should not be tested only when the
+data happens to oblige.
 
 ## Telling a real movement from reshuffling
 
@@ -96,19 +90,29 @@ coherence = |Σ effect| ÷ Σ|effect|
 ```
 
 A component whose segment effects are individually large but cancel almost
-exactly has not moved the business anywhere. At the disruption boundary:
+exactly has not moved the business anywhere. For the disruption window
+(2026-02-09 to 2026-02-23) across region and category:
 
 | Component | Net | Gross | Coherence | Share of net movement |
 | --- | --- | --- | --- | --- |
-| rate_effect | −0.0261 | 0.0404 | **0.645** | 80.0% |
-| interaction_effect | −0.0064 | 0.0099 | 0.652 | 19.7% |
-| mix_effect | +0.0001 | **0.2107** | **0.0005** | 0.3% |
+| rate_effect | −0.0440 | 0.0604 | **0.728** | 86.3% |
+| interaction_effect | −0.0069 | 0.0101 | 0.683 | 13.6% |
+| mix_effect | +0.0001 | **0.1825** | **0.0004** | 0.1% |
 
 Mix has by far the largest gross movement and essentially zero net movement:
 weekly demand reshuffles between sixteen fine segments without the total going
 anywhere. Reading those large individual mix effects as findings would be
 reading noise. The rate effect is smaller in gross terms but moved in one
-direction across the business, and carries 80% of the net change.
+direction across the business, and carries 86% of the net change.
+
+The disrupted segments are where that rate effect sits:
+
+| Segment | Fill rate before | after | Rate effect | Mix effect |
+| --- | --- | --- | --- | --- |
+| BLR \| Fruits | 0.9722 | 0.7041 | **−0.0201** | −0.0004 |
+| BLR \| Vegetables | 0.9514 | 0.7014 | **−0.0193** | +0.0195 |
+| BLR \| Herbs | 0.9917 | 0.9804 | −0.0006 | +0.0174 |
+| BLR \| Premium | 0.9328 | 0.9630 | +0.0017 | +0.0146 |
 
 Coherence is a description of how a component behaved. It is not a significance
 test and does not carry a confidence level.
@@ -124,17 +128,20 @@ movement.** To go deeper, decompose within the leading segment rather than
 summing across dimensions.
 
 `compare_dimensions` reports which cut localises a movement best. For the latest
-weekly net sales movement of −33,914:
+weekly net sales movement of −8,535:
 
 | Dimension | Top segment | Top contribution | Top-3 concentration |
 | --- | --- | --- | --- |
-| category | Fruits | −38,928 | **0.987** |
-| kam_id | K004 | −15,980 | 0.921 |
-| region_code | MUM | −20,513 | 0.862 |
-| channel | General Trade | −20,116 | 0.800 |
+| channel | Modern Trade | −30,987 | **0.975** |
+| kam_id | K001 | −30,553 | 0.956 |
+| category | Premium | −7,341 | 0.920 |
+| region_code | MUM | −21,523 | 0.908 |
 
-Every row describes the same −33,914. Category concentrates it most, so this
-movement is better understood as a category story than a regional one.
+Every row describes the same −8,535. Channel concentrates it most, so this
+movement is better understood as a channel story than a regional one. Note that
+the top contribution far exceeds the net movement in three of the four cuts:
+segments are offsetting heavily, which is exactly when `contribution_share`
+stops being meaningful.
 
 ## Shares, and when they are withheld
 

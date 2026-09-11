@@ -61,24 +61,18 @@ Not by habit, but by the data — and the data says something more specific than
 
 | Autocorrelation | `net_sales` | `orders` |
 | --- | --- | --- |
-| lag-1 | −0.060 | +0.046 |
-| lag-7 | **+0.108** | **+0.527** |
-| lag-14 | −0.126 | **+0.411** |
+| lag-1 | −0.082 | +0.079 |
+| lag-7 | +0.056 | **+0.273** |
+| lag-14 | **+0.396** | **+0.555** |
 
-Weekday demand in this business shows up mainly as **more orders**, not much
-larger baskets. Order volume therefore carries a strong weekly signal, while
-net sales — order count multiplied by basket size and price variation — is a
-noisier composite in which that signal is diluted.
+Weekday demand shows up mainly as **more orders**, not much larger baskets, so
+order volume carries the clearest weekly signal. Net sales — order count times
+basket size times price variation, across baskets of one to three lines — is a
+noisier composite in which that signal is diluted at lag-7 while surviving at
+lag-14.
 
-This predicts the measured results rather than being an after-the-fact story:
-seasonal models dominate on `orders`, where lag-7 is 0.527, and win only
-narrowly on `net_sales`, where it is 0.108. The day-of-week profile in net sales
-still spans about 20% (Saturday indexes at 1.12 of the mean, Monday at 0.92), so
-a weekly model remains worth having — just not decisively better than a
-well-tuned level model.
-
-Lag-1 is near zero or negative for both series, which is why carrying the last
-value forward is a weak baseline throughout.
+Lag-1 is near zero for both, which is why carrying the last value forward is a
+weak baseline throughout.
 
 ### Parameter selection
 
@@ -142,69 +136,62 @@ python scripts/evaluate_forecasts.py
 
 | Model | MAE | RMSE | WAPE | Bias | vs naive |
 | --- | --- | --- | --- | --- | --- |
-| ses | 7,626.72 | 10,015.32 | **0.1190** | −271.60 | **+34.9%** |
-| moving_average_7 | 7,673.40 | 10,276.28 | 0.1197 | −207.82 | +34.5% |
-| seasonal_mean_7 | 7,934.27 | 9,900.39 | 0.1238 | −590.00 | +32.2% |
-| seasonal_naive_7 | 9,893.08 | 12,751.90 | 0.1543 | −207.82 | +15.5% |
-| naive | 11,710.62 | 14,171.20 | 0.1827 | +2,886.27 | baseline |
+| **seasonal_mean_7** | 5,183.04 | 6,279.05 | **0.0764** | −2,305.21 | **+27.1%** |
+| moving_average_7 | 5,628.26 | 6,758.65 | 0.0829 | −690.11 | +20.8% |
+| ses | 5,816.69 | 6,889.42 | 0.0857 | −1,656.21 | +18.1% |
+| naive | 7,105.52 | 8,807.80 | 0.1047 | −4,316.16 | baseline |
+| seasonal_naive_7 | 8,073.79 | 10,119.36 | 0.1189 | −690.11 | −13.6% |
 
 ### `units`
 
 | Model | MAE | RMSE | WAPE | Bias | vs naive |
 | --- | --- | --- | --- | --- | --- |
-| ses | 28.63 | 34.77 | **0.0886** | −1.70 | **+37.1%** |
-| moving_average_7 | 28.97 | 34.68 | 0.0897 | +1.14 | +36.3% |
-| seasonal_mean_7 | 29.12 | 34.21 | 0.0901 | +0.29 | +36.0% |
-| seasonal_naive_7 | 32.79 | 40.90 | 0.1015 | +1.14 | +27.9% |
-| naive | 45.50 | 53.58 | 0.1408 | +18.64 | baseline |
+| **seasonal_mean_7** | 25.60 | 32.13 | **0.0814** | +12.50 | **+11.4%** |
+| naive | 28.89 | 37.85 | 0.0918 | −9.11 | baseline |
+| ses | 29.13 | 35.23 | 0.0926 | +8.70 | −0.8% |
+| moving_average_7 | 29.76 | 35.92 | 0.0946 | +7.75 | −3.0% |
+| seasonal_naive_7 | 40.39 | 48.20 | 0.1284 | +7.75 | −39.8% |
 
 ### `orders`
 
 | Model | MAE | RMSE | WAPE | Bias | vs naive |
 | --- | --- | --- | --- | --- | --- |
-| seasonal_mean_7 | 5.92 | 6.91 | **0.0703** | −2.19 | **+35.2%** |
-| seasonal_naive_7 | 5.96 | 7.42 | 0.0708 | −1.18 | +34.8% |
-| moving_average_7 | 6.88 | 7.82 | 0.0817 | −1.18 | +24.7% |
-| ses | 7.01 | 8.02 | 0.0832 | −2.17 | +23.3% |
-| naive | 9.14 | 10.98 | 0.1085 | +1.00 | baseline |
+| **ses** | 4.17 | 5.45 | **0.0523** | +0.94 | **+22.2%** |
+| moving_average_7 | 4.37 | 5.64 | 0.0549 | +0.54 | +18.4% |
+| seasonal_mean_7 | 4.88 | 5.81 | 0.0613 | +1.59 | +8.9% |
+| naive | 5.36 | 7.47 | 0.0672 | −2.93 | baseline |
+| seasonal_naive_7 | 5.82 | 7.14 | 0.0731 | +0.54 | −8.7% |
 
 ### No single model wins everywhere
 
-This is the honest reading of the comparison, and it is worth stating plainly
-rather than picking whichever model happens to look best per metric.
+`seasonal_mean_7` leads clearly on `net_sales` and `units`. On `orders` the
+level-tracking `ses` is ahead, which is worth stating rather than smoothing
+over: order volume is a noisier daily count once orders carry several lines, and
+tracking its level beats reconstructing a weekday profile from eight weeks of
+history.
 
-`ses` is narrowly ahead on `net_sales` and `units`; `seasonal_mean_7` is clearly
-ahead on `orders` and `ses` is the second-worst model there. Across all six
-backtest configurations and all three metrics, mean rank (1 = best):
-
-| Model | Mean rank | Mean WAPE | net_sales | orders | units |
-| --- | --- | --- | --- | --- | --- |
-| **seasonal_mean_7** | **1.89** | **0.093** | 2.17 | 1.33 | 2.17 |
-| ses | 2.28 | 0.097 | 1.33 | 4.00 | 1.50 |
-| moving_average_7 | 2.72 | 0.099 | 2.50 | 3.00 | 2.67 |
-| seasonal_naive_7 | 3.17 | 0.111 | 4.17 | 1.67 | 3.67 |
-| naive | 4.94 | 0.142 | 4.83 | 5.00 | 5.00 |
-
-`seasonal_mean_7` is therefore the recommended default: it is the most
-consistent across metrics, and its deficit to `ses` on sales and units is
-around 4% relative, well inside what 28 observations can distinguish. Choosing
-`ses` for revenue forecasting specifically would also be defensible.
+Every non-naive model beats the baseline on net sales. `seasonal_naive_7` trails
+the baseline on all three metrics: repeating one recent week carries that week's
+noise into the forecast, where averaging each weekday across the full history
+does not.
 
 ### Robustness
 
-`seasonal_mean_7` on `net_sales` across backtest configurations:
+`seasonal_mean_7` on `net_sales` ranks **first in all six** backtest
+configurations tested:
 
 | horizon | initial train | step | folds | WAPE | vs naive |
 | --- | --- | --- | --- | --- | --- |
-| 7 | 28 | 7 | 4 | 0.1238 | +32.2% |
-| 7 | 28 | 3 | 9 | 0.1205 | +28.0% |
-| 7 | 21 | 3 | 11 | 0.1270 | +32.9% |
-| 7 | 35 | 3 | 7 | 0.1241 | +21.0% |
-| 14 | 28 | 7 | 3 | 0.1201 | +34.1% |
-| 14 | 35 | 7 | 2 | 0.1079 | +47.6% |
+| 7 | 28 | 7 | 4 | 0.0764 | +27.1% |
+| 7 | 28 | 3 | 9 | 0.0749 | +36.8% |
+| 7 | 21 | 3 | 11 | 0.0927 | +8.3% |
+| 7 | 35 | 3 | 7 | 0.0775 | +43.4% |
+| 14 | 28 | 7 | 3 | 0.0788 | +30.1% |
+| 14 | 35 | 7 | 2 | 0.0741 | +31.0% |
 
-Every non-naive model beats the baseline in every configuration. The headline
-figure quoted elsewhere is the **most conservative** of these (+21.0%).
+The improvement spans +8.3% to +43.4% depending on configuration. The headline
+figure quoted elsewhere is the default configuration's +27.1%, and the range is
+reported here because a single number would hide how much it moves.
 
 ## Limitations
 
@@ -216,10 +203,10 @@ than left for a reader to discover.
    series, and the default backtest scores 28 observations per model. Gaps of a
    few percent between the leading models are not resolvable at this size.
 
-2. **`seasonal_naive_7` trails `seasonal_mean_7` on every metric.** Repeating a
-   single recent week carries that week's noise into the forecast; averaging
-   each weekday across the full history does not. The two capture the same
-   structure with very different variance.
+2. **`seasonal_naive_7` trails even the naive baseline on all three metrics.**
+   Repeating a single recent week carries that week's noise into the forecast;
+   averaging each weekday across the full history does not. The two capture the
+   same structure with very different variance.
 
 3. **Accuracy is measured at total-company daily grain.** Segment-level
    forecasts have not been evaluated and should not be assumed to reach the same

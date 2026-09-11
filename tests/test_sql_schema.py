@@ -85,8 +85,10 @@ def test_multi_sku_order_is_accepted(cleaned_dataset) -> None:
 
     first_line = tables["fact_sales"].head(1)
     order_id = first_line["order_id"].iloc[0]
-    current_sku = first_line["sku_id"].iloc[0]
-    other_sku = next(s for s in tables["dim_sku"]["sku_id"] if s != current_sku)
+    # Orders are baskets, so this order may already carry several lines.
+    existing_lines = int((tables["fact_sales"]["order_id"] == order_id).sum())
+    used_skus = set(tables["fact_sales"].loc[tables["fact_sales"]["order_id"] == order_id, "sku_id"])
+    other_sku = next(s for s in tables["dim_sku"]["sku_id"] if s not in used_skus)
 
     extra_line = first_line.copy()
     extra_line["sku_id"] = other_sku
@@ -95,4 +97,4 @@ def test_multi_sku_order_is_accepted(cleaned_dataset) -> None:
     lines = conn.execute(
         "SELECT COUNT(*) FROM fact_sales WHERE order_id = ?", (str(order_id),)
     ).fetchone()[0]
-    assert lines == 2
+    assert lines == existing_lines + 1

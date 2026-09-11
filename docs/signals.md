@@ -71,36 +71,45 @@ evidence that pointed nowhere and evidence that never existed.
 
 | Pattern | Recognised when | Consistent with |
 | --- | --- | --- |
-| `fulfilment_constraint` | Demand held or rose, and fulfilment did not keep pace | A supply or fulfilment problem |
-| `demand_softness` | Ordered units fell, with fulfilment following | Weaker demand |
+| `fulfilment_constraint` | Fulfilment did not keep pace with demand — the fill rate fell | A supply or fulfilment problem |
+| `demand_softness` | Orders fell while the fill rate held: fulfilment tracked demand down | Weaker demand |
 | `portfolio_mix_shift` | The movement is carried by mix rather than rate | A change in what was sold, not how well |
 | `unclassified` | No supporting metric moved decisively | Nothing yet; look closer |
 
-### Shipping more units is not proof that fulfilment held up
+### Two ways this rule was wrong
 
-This distinction was wrong in the first implementation and is worth recording.
+Both errors are recorded because both were found by testing against data rather
+than by reasoning about it, and both are easy to repeat.
 
-The original rule required fulfilled units to **fall** before a movement counted
-as a fulfilment constraint. Applied to the sample data it misclassified the
-clearest case in the dataset:
+**Shipping more units is not proof that fulfilment held up.** The first rule
+required fulfilled units to *fall*. A segment whose demand surged 38% while its
+shipments rose 9% was serving a far smaller share of its orders, and its fill
+rate said so — but because it shipped more units than the week before, the rule
+rejected it and the signal came back `unclassified`. That is the commonest shape
+a supply constraint takes in a *growing* segment.
 
-| BLR Fruits | Before | After | Change |
+**A modest demand dip does not make a fulfilment collapse a demand story.** The
+corrected rule still required demand to have held. On the current data:
+
+| BLR Fruits, 2026-02-09 → 2026-02-23 | Before | After | Change |
 | --- | --- | --- | --- |
-| Ordered units | 167 | 230 | **+37.7%** |
-| Fulfilled units | 161 | 175 | +8.7% |
-| Fill rate | 0.964 | 0.761 | **−21.1%** |
-| Available stock | 28.8 | 18.3 | −36.3% |
-| Stockout rate | 0.000 | 0.214 | — |
+| Ordered units | 180 | 169 | −6.1% |
+| Fulfilled units | 175 | 119 | **−32.0%** |
+| Fill rate | 0.972 | 0.704 | **−27.6%** |
+| Available stock | — | — | −49.5% |
 
-Demand surged 38%; fulfilment managed 9%. That segment served a far smaller
-share of its orders than the week before, and its stock and stockout figures say
-why. But because it *shipped more units*, the rule rejected it and the signal
-came back `unclassified`.
+Demand dipped 6%; fulfilment fell 32%. Requiring demand to have held classified
+this as `demand_softness`, which is plainly wrong.
 
-The criterion is now whether fulfilment **kept pace with the demand placed on
-it**, which is what a falling fill rate measures. That is the commonest shape a
-supply constraint takes in a growing segment, and the naive rule misses exactly
-that case. A regression test covers it.
+The rule is now simply: **a falling fill rate is arithmetic proof that
+fulfilment lagged demand.** The ratio cannot fall unless fulfilled units fell by
+more than ordered units did. Demand softness is reserved for the case where
+fulfilment tracked demand down and the ratio held.
+
+The mirror of that also had to be fixed: falling shipments alone prove nothing,
+since a segment shipping less because less was asked of it is serving its demand
+perfectly well. Shipments falling only indicate a constraint when the order book
+did not fall with them.
 
 ### Both directions get a live alternative
 
@@ -163,7 +172,7 @@ on the rate effect; because the mix component carried a large gross movement
 that cancelled to nothing, that denominator was inflated with noise and made
 every segment look like a negligible part of the movement. The clearest signal
 in the dataset scored 2.1% and failed the criterion. Measured within the rate
-effect it is 34.8%.
+effect it is 33.4%.
 
 **Confidence is not a probability and none of these criteria is a statistical
 test.** It describes how much of the available corroboration lined up.
@@ -184,35 +193,91 @@ by impact alone or filtered by confidence.
 Reproduce with:
 
 ```bash
-python scripts/detect_signals.py --current-period 2026-02-16 --comparison-period 2026-02-09
+python scripts/detect_signals.py --current-period 2026-02-23 --comparison-period 2026-02-09
 ```
 
 | Segment | Movement | Likely driver | Impact | Confidence | Priority |
 | --- | --- | --- | --- | --- | --- |
-| BLR \| Fruits | −0.2032 | fulfilment_constraint | 9,173.86 | high (6/6) | 9,173.86 |
-| BLR \| Vegetables | −0.2192 | fulfilment_constraint | 3,402.37 | high (5/6) | 3,402.37 |
-| MUM \| Herbs | −0.0426 | demand_softness | 461.69 | medium (3/6) | 277.01 |
+| BLR \| Fruits | −0.2681 | fulfilment_constraint | 8,324.65 | high (5/6) | 8,324.65 |
+| BLR \| Vegetables | −0.2500 | fulfilment_constraint | 5,795.41 | high (5/6) | 5,795.41 |
+| DEL \| Premium | −0.0302 | fulfilment_constraint | 4,426.63 | medium (4/6) | 2,655.98 |
 
 The top signal renders as:
 
-> fill_rate in BLR | Fruits moved −0.2032 (−21.1%) for the 2026-02-16 period
-> versus 2026-02-09. The movement in BLR | Fruits is **consistent with** a
-> fulfilment or supply constraint: fulfilment did not keep pace with the demand
-> placed on it. Supporting evidence: fulfilment grew more slowly than demand
-> (+8.7%); ordered units rose (+37.7%); available stock fell (−36.3%); stockout
-> rate rose. Estimated impact: 9,173.86 based on units not fulfilled relative to
-> the segment's prior fill rate, valued at its realised average selling price.
-> Confidence: high (6 of 6 criteria met). Alternative considered: demand weakened
-> and the fall in fulfilment simply followed it — not supported by the order
-> volumes. Recommended investigation: review inventory availability and
-> replenishment for BLR | Fruits, starting with the SKUs carrying the largest
-> unfulfilled volume.
+> fill_rate in BLR | Fruits moved −0.2681 (−27.6%) for the 2026-02-23 period
+> versus 2026-02-09. The movement is **consistent with** a fulfilment or supply
+> constraint: fulfilled units fell while ordered units did not. Supporting
+> evidence: fulfilled units fell (−32.0%); fulfilment fell faster than demand
+> (−6.1%) in orders; available stock fell (−49.5%); stockout rate rose.
+> Estimated impact: 8,324.65 based on units not fulfilled relative to the
+> segment's prior fill rate, valued at its realised average selling price.
+> Confidence: high (5 of 6 criteria met). Alternative considered: demand
+> weakened and the fall in fulfilment simply followed it. **Demand also softened
+> over this period, so a demand-led explanation cannot be dismissed.** It does
+> not account for the movement on its own: the fill rate fell, which means
+> fulfilment dropped by more than the order book did. Recommended investigation:
+> review inventory availability and replenishment for BLR | Fruits.
 
-Nothing in the call names Bengaluru, Fruits, Vegetables, or supply. The engine is
-given a fill-rate movement across every region and category and reaches that
-reading from the evidence. The third signal reaching a *different* conclusion on
-the same run matters: the classifier discriminates rather than labelling
-everything a supply problem.
+Note the criterion it **fails**. Demand softened 6% alongside the fulfilment
+collapse, so the alternative explanation is marked as live rather than dismissed,
+and the signal scores 5 of 6 rather than 6. A system that reported this as
+certain would be less useful, not more.
+
+## Evaluation: can it tell situations apart?
+
+Validating a diagnostic engine against one planted event only shows it finds
+what it was pointed at. The dataset therefore carries **four deliberately
+different situations**, and the engine is measured on whether it distinguishes
+them:
+
+| Scenario | Region | What was planted | Expected reading |
+| --- | --- | --- | --- |
+| `blr_supply_constraint` | BLR | Fulfilment and stock fall while demand holds | `fulfilment_constraint` |
+| `hyd_demand_softness` | HYD | Orders fall away; fulfilment stays healthy | `demand_softness` |
+| `del_mix_shift` | DEL | Demand tilts toward a structurally weaker category | `portfolio_mix_shift` |
+| `mum_control` | MUM | **Nothing** | Silence |
+
+Ground truth travels with the data in `dataset_manifest.json`, so the evaluation
+cannot drift from what was actually generated. Reproduce with:
+
+```bash
+python scripts/evaluate_signals.py
+```
+
+| Confidence floor | Correctly classified | Recall | False-alarm signals | Control silent |
+| --- | --- | --- | --- | --- |
+| **high** | 2 of 3 | 0.67 | **0** | yes |
+| **medium** | **3 of 3** | **1.00** | 7 | no |
+
+This is a precision/recall trade-off, measured rather than asserted. At a high
+floor the engine raises nothing it cannot support and stays completely silent on
+the control week, at the cost of missing the mix shift — the subtlest of the
+three. At a medium floor it classifies all three correctly and admits seven
+false alarms.
+
+**The control matters as much as the rest.** A detector that flags something
+every week is not detecting anything, so a region with nothing planted is scored
+on whether the engine says nothing. `min_confidence` exists for that: without it
+the engine always returns its top segments, and a quiet week yields a ranked list
+of ordinary noise.
+
+### Choosing the metric matters
+
+A demand decline is invisible in fill rate, because a segment that ships less of
+a smaller order book has not changed how well it fulfils. The HYD scenario is
+therefore evaluated on `ordered_units`, not `fill_rate`. That is ordinary
+analytical practice rather than a concession: you diagnose a service problem
+through a service metric and a demand problem through a volume one.
+
+### Transition weeks are harder, and honestly so
+
+The supply constraint begins mid-week. In the week that straddles it only five
+days are affected, and a segment whose weekly order volume ordinarily swings by
+a third can show a demand dip large enough to dominate that week's evidence. The
+engine reports what the numbers say, which is why the evaluation compares fully
+affected windows and why a single-period signal deserves less weight than a
+sustained one. A test asserts this behaviour rather than leaving it to be
+discovered.
 
 ## Limitations
 
@@ -234,3 +299,10 @@ everything a supply problem.
 7. **Inventory evidence is unavailable by customer, channel and manager**, so
    signals at those grains rest on demand and fulfilment evidence alone and are
    correspondingly weaker.
+8. **The evaluation covers four scenarios on one dataset.** Pricing, competitive,
+   seasonal and data-quality explanations are not planted and not modelled, and
+   a recall of 1.00 across three planted situations is not a claim about
+   behaviour on situations that were never tested.
+9. **Small segments rank low.** Ranking is by absolute contribution, so a 60%
+   collapse in a thin segment can sit below a modest move in a large one. The
+   HYD demand scenario is a 26-unit movement and appears at rank 2 of 4.

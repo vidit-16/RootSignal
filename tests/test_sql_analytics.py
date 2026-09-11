@@ -240,7 +240,7 @@ def test_sql_watchlist_finds_the_same_segments_as_the_signal_engine(cleaned_data
     business logic, not one implementation of it, produces the result.
     """
     watchlist = run_query_file(database, "supply_watchlist")
-    disruption_week = watchlist[watchlist["week_start"] == "2026-02-16"]
+    disruption_week = watchlist[watchlist["week_start"] == "2026-02-23"]
     sql_segments = {
         f"{row.region_code} | {row.category}" for row in disruption_week.itertuples()
     }
@@ -250,7 +250,7 @@ def test_sql_watchlist_finds_the_same_segments_as_the_signal_engine(cleaned_data
         metric="fill_rate",
         dimension=["region_code", "category"],
         period="week",
-        current_period="2026-02-16",
+        current_period="2026-02-23",
         comparison_period="2026-02-09",
         top_n=2,
     )

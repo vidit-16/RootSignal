@@ -135,6 +135,7 @@ def detect_signals(
     comparison_period: object | None = None,
     top_n: int = 3,
     direction: str = "negative",
+    min_confidence: str | None = None,
 ) -> list[RootSignal]:
     """Find and assemble the signals behind a metric movement.
 
@@ -143,6 +144,11 @@ def detect_signals(
     differ: a segment whose fulfilment collapsed can show a positive total
     contribution if demand moved away from it at the same time, and ranking on
     the total would drop it from the list entirely.
+
+    ``min_confidence`` discards signals below a level. Without it the function
+    always returns its top segments, so a quiet period yields a ranked list of
+    ordinary noise and the engine can never report that nothing happened. Set it
+    to "high" for a watchlist that stays silent unless the evidence lines up.
     """
     dims = list(dimension)
     summary = summarise_by_period(tables, period=period, group_by=dims)
@@ -242,6 +248,18 @@ def detect_signals(
                 notes=tuple(notes),
             )
         )
+
+    if min_confidence is not None:
+        if min_confidence not in CONFIDENCE_WEIGHTS:
+            raise ValueError(
+                f"min_confidence must be one of {sorted(CONFIDENCE_WEIGHTS)}; got {min_confidence!r}."
+            )
+        floor = CONFIDENCE_WEIGHTS[min_confidence]
+        signals = [
+            signal
+            for signal in signals
+            if CONFIDENCE_WEIGHTS[signal.confidence.level] >= floor
+        ]
 
     return sorted(signals, key=lambda signal: signal.priority_score, reverse=True)
 
