@@ -65,6 +65,25 @@ return pd.date_range(history.index.max(), periods=horizon + 1, freq="D")[1:]
 
 Same days, no arithmetic, no warning.
 
+**A second deprecation, and this one is not ours to defuse.** Three warnings
+remain under numpy 2.5, all from the test that checks a step change is nearly
+invisible in the period straddling it:
+
+```python
+straddling = starts - pd.Timedelta(days=starts.weekday())
+```
+
+The message is the same shape as the one above -- the 'generic' unit for NumPy
+timedelta is deprecated and "will raise an error in the future" -- but the
+frame it is raised from is `pandas/_libs/tslibs/timedeltas.pyx`, inside pandas
+itself. There is no spelling of `pd.Timedelta(days=n)` that avoids it.
+
+So it is recorded rather than fixed or silenced. When numpy promotes the
+warning to an error, pandas 2.3.3 is what stops working, and the repair has to
+come from pandas. The container is where it will show up first, because the
+container is what resolves the top of the range -- which is the same reason it
+caught the forecasting fuse while local development could not.
+
 **The results are identical across both.** The worked example returns
 `BLR | Fruits, -0.2889, fulfilment_constraint, 8,970.60, high` on numpy 1.26
 under Windows and on numpy 2.5 under Linux, and `seasonal_mean_7` improves on
@@ -92,6 +111,11 @@ indirection to save a few percent.
 - `data/raw/external` and `data/raw/generated` are excluded from the build
   context. The external dataset is 44 MB and downloads on demand; the generated
   one is rebuilt inside the image.
+- Compiled bytecode is excluded too, by `**/`-anchored patterns. A bare
+  `__pycache__` matches only the context root, so nested ones were copied in and
+  the image shipped modules compiled on the developer's machine. `COPY`
+  preserves mtimes, so CPython would load that bytecode in preference to the
+  source beside it -- the image testing the host's build rather than its own.
 - `docker compose up` mounts `./reports`, so workbooks written by
   `build_excel_reports.py` land in the working tree.
 - The explanation layer runs fully without an API key and records why it fell
