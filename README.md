@@ -68,6 +68,7 @@ Power BI is intentionally outside the core project scope.
 | Driver decomposition | Exact attribution of a movement to segments, with rate/mix separation for ratios | [decomposition.md](docs/decomposition.md) |
 | Impact estimation | Fulfilment shortfall valued at realised prices, with every assumption stated | [signals.md](docs/signals.md) |
 | RootSignal engine | Evidence, pattern, impact, confidence and recommended investigation, ranked | [signals.md](docs/signals.md) |
+| SQL layer | Staging views, commercial mart and seven business queries, all executed by tests | [sql.md](docs/sql.md) |
 | Pipeline contract | End-to-end test from generation through mart reconciliation | [pipeline_contract.md](docs/pipeline_contract.md) |
 
 ### Measured results
@@ -107,12 +108,17 @@ Numbers below come from the committed test suite and evaluation scripts, not fro
   recommended investigation. A second segment on the same run is classified as
   demand softness instead, so the classifier discriminates rather than labelling
   everything a supply problem. Reproduce with `python scripts/detect_signals.py`.
-- **Tests:** 140 automated tests covering validation, cleaning, KPIs, consolidation,
-  SQL schema conformance, forecasting, trend and variance analysis, driver
-  decomposition, impact estimation, signal assembly, and the end-to-end pipeline.
-  One asserts that no signal output ever claims causation.
+- **SQL/Python parity:** the commercial mart is implemented twice, in Python and
+  in SQL, and a test asserts the two agree **row for row across 3,109 rows and
+  eleven metric columns**. Separately, the SQL supply watchlist and the Python
+  signal engine — which share no code — independently return the same two
+  disrupted segments.
+- **Tests:** 159 automated tests covering validation, cleaning, KPIs, consolidation,
+  SQL schema conformance and parity, forecasting, trend and variance analysis,
+  driver decomposition, impact estimation, signal assembly, and the end-to-end
+  pipeline. One asserts that no signal output ever claims causation.
 
 ### Not yet built
 
 The optional LLM explanation layer, the Streamlit dashboard, Excel reporting,
-SQL marts and analytics queries, database ingestion, and Docker.
+database ingestion, and Docker.
