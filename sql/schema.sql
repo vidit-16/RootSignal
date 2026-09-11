@@ -46,6 +46,9 @@ CREATE TABLE dim_customer (
     FOREIGN KEY (kam_id) REFERENCES dim_kam(kam_id)
 );
 
+-- Grain: one commercial sales transaction line.
+-- A single order may carry several SKUs, so order_id alone is not unique;
+-- the key must match validation.contracts.TABLE_CONTRACTS['fact_sales'].key_columns.
 CREATE TABLE fact_sales (
     order_id TEXT NOT NULL,
     date DATE NOT NULL,
@@ -60,6 +63,7 @@ CREATE TABLE fact_sales (
     unit_price REAL NOT NULL CHECK (unit_price >= 0),
     discount_pct REAL NOT NULL CHECK (discount_pct >= 0 AND discount_pct <= 1),
     net_sales REAL NOT NULL CHECK (net_sales >= 0),
+    PRIMARY KEY (order_id, sku_id, sales_type),
     FOREIGN KEY (date) REFERENCES dim_date(date),
     FOREIGN KEY (customer_id) REFERENCES dim_customer(customer_id),
     FOREIGN KEY (region_code) REFERENCES dim_region(region_code),
@@ -67,6 +71,9 @@ CREATE TABLE fact_sales (
     FOREIGN KEY (sku_id) REFERENCES dim_sku(sku_id)
 );
 
+-- Grain: one customer order line.
+-- Shares the sales key so order counts never multiply across SKUs;
+-- must match validation.contracts.TABLE_CONTRACTS['fact_orders'].key_columns.
 CREATE TABLE fact_orders (
     order_id TEXT NOT NULL,
     date DATE NOT NULL,
@@ -79,6 +86,7 @@ CREATE TABLE fact_orders (
     cancelled_units INTEGER NOT NULL CHECK (cancelled_units >= 0),
     order_status TEXT NOT NULL,
     sales_type TEXT NOT NULL CHECK (sales_type IN ('PRIMARY', 'SECONDARY')),
+    PRIMARY KEY (order_id, sku_id, sales_type),
     FOREIGN KEY (date) REFERENCES dim_date(date),
     FOREIGN KEY (customer_id) REFERENCES dim_customer(customer_id),
     FOREIGN KEY (region_code) REFERENCES dim_region(region_code),

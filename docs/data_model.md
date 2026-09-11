@@ -25,21 +25,25 @@ One row per operating region/city. Keeps geography consistent across sales, orde
 
 ### `fact_sales`
 **Grain:** one commercial sales transaction line.
+**Key:** `(order_id, sku_id, sales_type)`
 
 Supports both `PRIMARY` and `SECONDARY` sales through `sales_type`. Each row records SKU, customer, KAM, geography, channel, units, pricing, discounts, and net sales.
 
 ### `fact_orders`
 **Grain:** one customer order line.
+**Key:** `(order_id, sku_id, sales_type)`
 
 Stores ordered, fulfilled, and cancelled quantities plus order status. This is the operational source for order and fulfillment KPIs.
 
 ### `fact_inventory`
 **Grain:** one SKU × warehouse/region × day snapshot.
+**Key:** `(date, sku_id, warehouse)`
 
 Stores opening stock, receipts, available stock, demand, fulfilled units, and stockout state.
 
 ### `fact_targets`
 **Grain:** one date × region × category × channel target.
+**Key:** `(date, region_code, category, channel)`
 
 Stores sales, order, and fill-rate targets for plan-vs-actual analysis.
 
@@ -74,6 +78,8 @@ Stores sales, order, and fill-rate targets for plan-vs-actual analysis.
 5. Driver contribution is calculated from metric movement before ranking regions, categories, channels, customers, KAMs, or SKUs.
 6. Impact estimates must state the assumption used, such as lost units multiplied by realized or representative selling price.
 7. Primary and secondary sales remain separately queryable even though they share a common fact structure.
+8. Fact keys are declared once and enforced in both places. `sql/schema.sql` and `validation.contracts.TABLE_CONTRACTS` must agree on every key, so the database cannot accept rows the validator rejects. `tests/test_sql_schema.py` fails if they drift apart.
+9. `order_id` is deliberately not a key on its own. A single order may carry several SKUs, so keying on it would reject legitimate multi-SKU orders and make order counts ambiguous.
 
 ## Data-quality expectations
 
