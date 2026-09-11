@@ -71,23 +71,28 @@ Power BI is intentionally outside the core project scope.
 
 Numbers below come from the committed test suite and evaluation scripts, not from estimates.
 
-- **Forecast accuracy:** `seasonal_mean_7` reduces WAPE by **23.5%** against a
-  naive baseline on daily net sales (rolling-origin backtest, horizon 7,
-  4 folds, 28 scored observations). It ranks first in every backtest
-  configuration tested; 23.5% is the most conservative of those. Reproduce with
-  `python scripts/evaluate_forecasts.py`.
-- **Data quality:** validation detects **8 errors** across the 9 raw tables. Cleaning
+- **Forecast accuracy:** `seasonal_mean_7` reduces WAPE against a naive baseline
+  by **32.2%** on daily net sales, **36.0%** on units, and **35.2%** on order
+  volume (rolling-origin backtest, horizon 7, 4 folds, 28 scored observations).
+  It has the best mean rank across all three metrics and six backtest
+  configurations; the most conservative improvement measured in any of them is
+  +21.0%. Reproduce with `python scripts/evaluate_forecasts.py`.
+- **Data quality:** validation detects **8 errors** across the 10 raw tables. Cleaning
   imputes 3 recoverable fields, removes 2 exact duplicates, and quarantines
   1 impossible order line, after which validation passes with zero errors.
 - **Reconciliation:** the commercial mart reconciles exactly to cleaned facts on
   net sales, units, ordered units, and fulfilled units.
-- **Variance coverage:** plan-versus-actual attainment spans **85.1% to 119.0%**
-  across 64 region/category/channel segments (23 above plan, 41 below), so target
-  variance separates segments instead of failing them uniformly.
-- **Scenario detection:** the seeded supply disruption is detected without being
-  told where to look. Weekly fill rate in the affected Bengaluru segments falls
-  from 0.99 to 0.69 and crosses from above target to **0.227 below** it.
-- **Tests:** 80 automated tests covering validation, cleaning, KPIs, consolidation,
+- **Variance coverage:** plan-versus-actual attainment spans **85.5% to 119.8%**
+  across 64 region/category/channel segments (25 above plan, 39 below), so target
+  variance separates segments instead of failing them uniformly. KAM quota
+  attainment runs 93.4% to 97.4% across the four key account managers.
+- **Scenario detection:** the seeded supply disruption is found without being told
+  where to look. Weekly fill rate in the affected Bengaluru segments falls from
+  0.96 to 0.67 and crosses from above the service target to **0.198 below** it —
+  while order volume in those same segments *rose* 9.5% and ordered units rose
+  6.3%. Demand could have fallen and did not, which is what makes this a supply
+  signal rather than a demand signal.
+- **Tests:** 85 automated tests covering validation, cleaning, KPIs, consolidation,
   SQL schema conformance, forecasting, trend and variance analysis, and the
   end-to-end pipeline.
 

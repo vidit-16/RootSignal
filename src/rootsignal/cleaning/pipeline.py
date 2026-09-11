@@ -131,6 +131,17 @@ def _clean_targets(tables: dict[str, pd.DataFrame], events: list[AuditEvent]) ->
     return targets
 
 
+def _clean_kam_targets(tables: dict[str, pd.DataFrame], events: list[AuditEvent]) -> pd.DataFrame:
+    targets = tables["fact_kam_targets"].copy()
+    before = len(targets)
+    targets = targets.drop_duplicates(subset=["date", "kam_id"], keep="first").reset_index(drop=True)
+    removed = before - len(targets)
+    if removed:
+        events.append(_event("fact_kam_targets", "drop_duplicate_key", removed, "Kept the first row for duplicate KAM quota keys."))
+    targets["date"] = pd.to_datetime(targets["date"], errors="coerce").dt.date
+    return targets
+
+
 def clean_dataset(tables: dict[str, pd.DataFrame]) -> CleaningResult:
     """Clean recoverable defects and quarantine unsafe fact rows.
 
@@ -141,6 +152,7 @@ def clean_dataset(tables: dict[str, pd.DataFrame]) -> CleaningResult:
     required = {
         "dim_date", "dim_kam", "dim_region", "dim_sku", "dim_customer",
         "fact_sales", "fact_orders", "fact_inventory", "fact_targets",
+        "fact_kam_targets",
     }
     missing = required - set(tables)
     if missing:
@@ -152,6 +164,7 @@ def clean_dataset(tables: dict[str, pd.DataFrame]) -> CleaningResult:
     cleaned["fact_orders"], order_quarantine = _clean_orders(cleaned, events)
     cleaned["fact_inventory"], inventory_quarantine = _clean_inventory(cleaned, events)
     cleaned["fact_targets"] = _clean_targets(cleaned, events)
+    cleaned["fact_kam_targets"] = _clean_kam_targets(cleaned, events)
 
     audit = pd.DataFrame([e.__dict__ for e in events], columns=["table", "action", "rows", "detail"])
     if audit.empty:

@@ -32,9 +32,9 @@ sample range runs 2026-01-01 (a Thursday) to 2026-03-01, so:
 
 Comparing those against full periods reports a change in calendar coverage as
 though it were a change in trade. Concretely, including the partial first week
-produces a **+72% week-over-week surge** into week two. Nothing surged; the
+produces a **+78.7% week-over-week surge** into week two. Nothing surged; the
 first week was simply short. With partial periods excluded, real weekly
-movement is between −9% and +6%.
+movement runs between −7.2% and +11.9%.
 
 Every period is therefore labelled complete or partial. Completeness is judged
 against the calendar, not against how many rows are present, so a genuine
@@ -149,13 +149,24 @@ date × region × category × channel grain was not real and any channel-level
 target comparison would have silently matched nothing.
 
 Targets are now anchored to each segment's realised daily volume, with a
-persistent per-segment plan bias, and carry real channels. Overall attainment is
-**97.4%**, with segment attainment spanning **85.1% to 119.0%** — 23 segments
-above plan and 41 below. That spread is what makes plan-versus-actual analysis
-worth running.
+persistent per-segment plan bias, and carry real channels. Segment attainment
+spans **85.5% to 119.8%** (median 97.7%) — 25 segments above plan and 39 below.
+That spread is what makes plan-versus-actual analysis worth running.
 
-This changed `fact_targets` from 960 to 3,840 rows. Sales, orders, and inventory
-are untouched, and forecast accuracy figures are unchanged.
+This changed `fact_targets` from 960 to 3,840 rows.
+
+### KAM quotas
+
+`fact_kam_targets` holds daily revenue and order quotas at date x kam_id, and is
+a deliberately separate table. A key account manager owns a portfolio of
+customers rather than a region or a category, so pushing the quota into the
+region/category/channel grain would leave most combinations empty. Attainment
+across the four managers runs **93.4% to 97.4%**.
+
+Attributing orders to a manager requires `kam_id` on the order fact, which comes
+from the customer master rather than from the order line. The join is
+many-to-one on a unique customer key, so it cannot multiply order lines, and a
+test asserts that ordered units and order counts are unchanged by it.
 
 ## Worked example: the seeded supply disruption
 
@@ -164,13 +175,19 @@ share of demand. Weekly fill rate for BLR Fruits:
 
 | Week of | Fill rate | Change |
 | --- | --- | --- |
-| 2026-02-02 | 0.949 | +0.009 |
-| 2026-02-09 | 0.994 | +0.045 |
-| 2026-02-16 | 0.795 | **−0.199** |
-| 2026-02-23 | 0.693 | **−0.102** |
+| 2026-02-02 | 0.985 | +0.091 |
+| 2026-02-09 | 0.964 | −0.021 |
+| 2026-02-16 | 0.761 | **−0.203** |
+| 2026-02-23 | 0.671 | **−0.090** |
 
-Against the 0.93 service-level target, BLR Vegetables ran between +0.01 and
-+0.06 **above** target through 2026-02-09, then fell to −0.188 and −0.227.
+Against the 0.93 service-level target, BLR Vegetables ran between +0.003 and
++0.070 **above** target through 2026-02-09, then fell to −0.149 and −0.198.
+
+Demand did not go with it. Over the same window the affected segments took
+**more** orders per day, not fewer (10.96 to 12.00) and ordered units rose from
+47.3 to 50.3 per day, while fulfilled units fell from 45.2 to 34.7. Daily order
+volume varies in this dataset, so a demand collapse was expressible and simply
+did not occur — which is what separates a supply signal from a demand signal.
 
 This is evidence that fulfilment deteriorated in a specific segment at a
 specific time. It is **not** a statement of cause. Establishing whether supply,
@@ -180,10 +197,11 @@ demand, or something else drove it is the job of the layers above.
 
 1. **Week-over-week on a 60-day range yields 8 complete weeks**, so seven
    comparisons. Month-over-month yields one. These are short series.
-2. **`variance_vs_target` requires every grouping dimension to exist in
-   `fact_targets`.** Targets carry region, category, and channel, so KAM-level,
-   customer-level, and SKU-level target variance is not available and the
-   function raises rather than returning empty comparisons.
+2. **Target variance needs a target table at a matching grain.** The commercial
+   plan carries region, category, and channel; KAM quotas live in
+   `fact_kam_targets` at date x kam_id. Customer-level and SKU-level target
+   variance remain unavailable, and `variance_vs_target` raises rather than
+   returning empty comparisons.
 3. **Rate targets are averaged across the period**, as described above.
 4. **Ranking is by magnitude only.** No significance test is applied, so a large
    gap in a volatile thin segment ranks alongside a large gap in a stable one.

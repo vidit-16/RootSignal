@@ -23,6 +23,7 @@ import pandas as pd
 SEED = 42
 START_DATE = date(2026, 1, 1)
 N_DAYS = 60
+BASE_DAILY_ORDERS = 80
 
 REGIONS = [
     ("BLR", "Bengaluru", "South"),
@@ -137,9 +138,19 @@ def build_transactions(
 
     for current_date in dates:
         weekday = current_date.weekday()
-        seasonal = 1 + (0.14 if weekday in (4, 5) else (-0.05 if weekday == 0 else 0))
+        # Weekday demand shows up mainly as more orders rather than much larger
+        # baskets, so the seasonal effect is split accordingly. Daily order
+        # volume also carries genuine noise: a fixed order count per day would
+        # make "demand held steady while fulfilment fell" true by construction
+        # rather than something the analysis can actually establish.
+        order_seasonal = 1 + (0.10 if weekday in (4, 5) else (-0.04 if weekday == 0 else 0))
+        basket_seasonal = 1 + (0.04 if weekday in (4, 5) else (-0.01 if weekday == 0 else 0))
+        daily_orders = max(
+            1,
+            int(round(rng.normal(BASE_DAILY_ORDERS * order_seasonal, BASE_DAILY_ORDERS * 0.07))),
+        )
 
-        for _ in range(80):
+        for _ in range(daily_orders):
             order_counter += 1
             customer = customer_df.iloc[random.randrange(len(customer_df))]
             sku = sku_df.iloc[random.randrange(len(sku_df))]
@@ -150,7 +161,7 @@ def build_transactions(
                 and sku["category"] in ("Fruits", "Vegetables")
             )
 
-            lam = (5.4 if customer["channel"] == "Modern Trade" else 3.3) * seasonal
+            lam = (5.4 if customer["channel"] == "Modern Trade" else 3.3) * basket_seasonal
             ordered_units = max(1, int(rng.poisson(lam)))
             fulfillment_ratio = (
                 rng.uniform(0.90, 0.99) if not shock else rng.uniform(0.62, 0.82)
@@ -388,6 +399,52 @@ def build_inventory_and_targets(
     return inventory_df, targets_df
 
 
+def build_kam_targets(
+    rng: np.random.Generator,
+    dimensions: dict[str, pd.DataFrame],
+    sales_df: pd.DataFrame,
+    orders_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build daily revenue and order quotas for each key account manager.
+
+    KAM quotas are a separate planning artifact from the commercial plan in
+    fact_targets. A KAM owns a portfolio of customers rather than a region or a
+    category, so the quota belongs at its own grain instead of being forced into
+    the region/category/channel grain, where most combinations would be empty.
+
+    Like the commercial targets, quotas are anchored to the volume each KAM
+    actually delivers and carry a persistent plan bias, so some managers run
+    ahead of quota and others behind.
+    """
+    dates = dimensions["dim_date"]["date"].tolist()
+    day_count = len(dates)
+    customer_kam = dimensions["dim_customer"].set_index("customer_id")["kam_id"]
+    orders_by_kam = orders_df.assign(kam_id=orders_df["customer_id"].map(customer_kam))
+
+    sales_baseline = sales_df.groupby("kam_id")["net_sales"].sum() / day_count
+    order_baseline = orders_by_kam.groupby("kam_id")["order_id"].nunique() / day_count
+    plan_bias = dict(zip(sales_baseline.index, rng.normal(1.0, 0.06, size=len(sales_baseline))))
+
+    rows: list[list[object]] = []
+    for current_date in dates:
+        weekday_uplift = 1.08 if current_date.weekday() in (4, 5) else 1.0
+        for kam_id, _ in KAMS:
+            bias = float(plan_bias.get(kam_id, 1.0))
+            sales_target = round(
+                float(sales_baseline.get(kam_id, 0.0))
+                * bias
+                * weekday_uplift
+                * (1 + rng.uniform(-0.05, 0.05)),
+                2,
+            )
+            order_target = max(
+                1, int(round(float(order_baseline.get(kam_id, 0.0)) * bias * weekday_uplift))
+            )
+            rows.append([current_date, kam_id, sales_target, order_target])
+
+    return pd.DataFrame(rows, columns=["date", "kam_id", "sales_target", "order_target"])
+
+
 def add_controlled_quality_issues(
     sales_df: pd.DataFrame, orders_df: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -410,6 +467,7 @@ def write_dataset(output_dir: Path) -> dict[str, object]:
     dimensions = build_dimensions(rng)
     sales_df, orders_df = build_transactions(rng, dimensions)
     inventory_df, targets_df = build_inventory_and_targets(rng, dimensions, orders_df, sales_df)
+    kam_targets_df = build_kam_targets(rng, dimensions, sales_df, orders_df)
     sales_raw, orders_raw = add_controlled_quality_issues(sales_df, orders_df)
 
     tables = {
@@ -422,6 +480,7 @@ def write_dataset(output_dir: Path) -> dict[str, object]:
         "fact_orders": orders_raw,
         "fact_inventory": inventory_df,
         "fact_targets": targets_df,
+        "fact_kam_targets": kam_targets_df,
     }
 
     row_counts: dict[str, int] = {}

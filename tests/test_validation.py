@@ -6,7 +6,7 @@ from rootsignal.validation import DatasetValidator
 
 def test_loader_reads_all_generated_tables(generated_dataset_dir: Path) -> None:
     tables = load_dataset(generated_dataset_dir)
-    assert len(tables) == 9
+    assert len(tables) == 10
     assert "fact_sales" in tables
     assert "dim_sku" in tables
 

@@ -373,3 +373,32 @@ def test_backtest_is_reproducible_across_runs(cleaned_dataset) -> None:
     first = summarise_backtest(rolling_origin_evaluate(series, horizon=7, initial_train=28, step=7))
     second = summarise_backtest(rolling_origin_evaluate(series, horizon=7, initial_train=28, step=7))
     pd.testing.assert_frame_equal(first, second)
+
+
+def test_daily_order_volume_varies_enough_to_be_forecastable(cleaned_dataset) -> None:
+    """Order volume must actually move, or forecasting it proves nothing.
+
+    A fixed daily order count makes every model score near-zero error and makes
+    "demand held steady" true by construction rather than by observation.
+    """
+    tables = cleaned_dataset.tables
+    orders = extract_metric(build_daily_series(tables["fact_sales"], tables["fact_orders"]), "orders")
+
+    coefficient_of_variation = float(orders.std() / orders.mean())
+    assert coefficient_of_variation > 0.03
+    assert orders.nunique() > 10
+
+
+def test_seasonal_model_beats_naive_baseline_on_order_volume(cleaned_dataset) -> None:
+    """Order volume carries the clearest weekly profile of the three metrics."""
+    tables = cleaned_dataset.tables
+    series = extract_metric(build_daily_series(tables["fact_sales"], tables["fact_orders"]), "orders")
+
+    summary = compare_against_baseline(
+        summarise_backtest(rolling_origin_evaluate(series, horizon=7, initial_train=28, step=7))
+    )
+    seasonal = summary[summary["model"] == "seasonal_mean_7"].iloc[0]
+
+    assert summary["wape"].notna().all()
+    assert seasonal["wape"] > 0.0  # no longer a degenerate, trivially perfect series
+    assert seasonal["wape_improvement_vs_baseline"] > 0.10

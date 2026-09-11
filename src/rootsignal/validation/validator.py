@@ -115,6 +115,7 @@ class DatasetValidator:
             ("fact_inventory", "sku_id", "dim_sku", "sku_id"),
             ("fact_inventory", "region_code", "dim_region", "region_code"),
             ("fact_targets", "region_code", "dim_region", "region_code"),
+            ("fact_kam_targets", "kam_id", "dim_kam", "kam_id"),
         )
         issues: list[ValidationIssue] = []
         for child, child_col, parent, parent_col in relations:
@@ -132,7 +133,7 @@ class DatasetValidator:
 
         if "dim_date" in tables and "date" in tables["dim_date"].columns:
             valid_dates = set(pd.to_datetime(tables["dim_date"]["date"], errors="coerce").dt.date.dropna())
-            for table in ("fact_sales", "fact_orders", "fact_inventory", "fact_targets"):
+            for table in ("fact_sales", "fact_orders", "fact_inventory", "fact_targets", "fact_kam_targets"):
                 frame = tables.get(table)
                 if frame is None or "date" not in frame.columns:
                     continue

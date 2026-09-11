@@ -49,6 +49,11 @@ TABLE_CONTRACTS: dict[str, TableContract] = {
         ("sales_target", "order_target"),
         {"fill_rate_target": (0.0, 1.0)},
     ),
+    "fact_kam_targets": TableContract(
+        ("date", "kam_id", "sales_target", "order_target"),
+        ("date", "kam_id"),
+        ("sales_target", "order_target"),
+    ),
 }
 
 

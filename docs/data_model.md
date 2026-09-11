@@ -47,6 +47,14 @@ Stores opening stock, receipts, available stock, demand, fulfilled units, and st
 
 Stores sales, order, and fill-rate targets for plan-vs-actual analysis.
 
+### `fact_kam_targets`
+**Grain:** one date x key account manager quota.
+**Key:** `(date, kam_id)`
+
+Stores daily revenue and order quotas per KAM. Kept separate from
+`fact_targets` because a KAM owns a portfolio of customers rather than a
+region or category, so the quota does not belong at the commercial-plan grain.
+
 ## Key relationships
 
 ```text

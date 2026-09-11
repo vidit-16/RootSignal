@@ -23,6 +23,7 @@ LOAD_ORDER = (
     "fact_orders",
     "fact_inventory",
     "fact_targets",
+    "fact_kam_targets",
 )
 
 

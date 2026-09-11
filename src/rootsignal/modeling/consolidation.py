@@ -86,13 +86,18 @@ def enrich_orders(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
         ["sku_name", "category", "sub_category", "pack_size_kg"],
         "dim_sku",
     )
+    # kam_id comes from the customer master rather than from the order line.
+    # A key account manager owns customers, so order and fulfilment metrics can
+    # only be attributed to a manager through that relationship. The join is
+    # many-to-one on a unique customer key, so it cannot multiply order lines.
     orders = _left_enrich(
         orders,
         tables["dim_customer"],
         "customer_id",
-        ["customer_name", "customer_type"],
+        ["customer_name", "customer_type", "kam_id"],
         "dim_customer",
     )
+    orders = _left_enrich(orders, tables["dim_kam"], "kam_id", ["kam_name"], "dim_kam")
     orders = _left_enrich(
         orders,
         tables["dim_region"],

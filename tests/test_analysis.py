@@ -518,3 +518,78 @@ def test_fill_rate_collapse_in_the_disrupted_segment_is_detected(cleaned_dataset
         & (against_target["period_start"] < pd.Timestamp("2026-02-16"))
     ]
     assert (early["variance"] > 0).mean() > 0.5
+
+
+def test_demand_held_firm_while_fulfilment_fell_in_the_disrupted_segment(cleaned_dataset) -> None:
+    """The project's central question: is this a demand decline or a supply failure?
+
+    Daily order volume varies in this dataset, so a demand collapse was
+    expressible. In the Bengaluru fruit and vegetable segments it did not
+    happen: ordered units held up while fulfilled units fell sharply. That
+    contrast is the whole basis for calling the movement a supply signal rather
+    than a demand signal, and it would be untestable if order volume were fixed.
+    """
+    tables = cleaned_dataset.tables
+    orders = tables["fact_orders"].merge(
+        tables["dim_sku"][["sku_id", "category"]], on="sku_id", validate="many_to_one"
+    )
+    orders = orders[
+        (orders["region_code"] == "BLR") & (orders["category"].isin(["Fruits", "Vegetables"]))
+    ].copy()
+    orders["date"] = pd.to_datetime(orders["date"])
+
+    disruption_start = pd.Timestamp("2026-02-18")
+    before = orders[orders["date"] < disruption_start]
+    after = orders[orders["date"] >= disruption_start]
+
+    def per_day(frame: pd.DataFrame, column: str) -> float:
+        return float(frame[column].sum() / frame["date"].nunique())
+
+    ordered_before, ordered_after = per_day(before, "ordered_units"), per_day(after, "ordered_units")
+    filled_before, filled_after = per_day(before, "fulfilled_units"), per_day(after, "fulfilled_units")
+
+    # Demand did not fall away: ordered units are at least as high as before.
+    assert ordered_after >= ordered_before * 0.95
+    # Fulfilment did fall, and by much more than demand moved.
+    assert filled_after < filled_before * 0.85
+
+    fill_before = before["fulfilled_units"].sum() / before["ordered_units"].sum()
+    fill_after = after["fulfilled_units"].sum() / after["ordered_units"].sum()
+    assert fill_before - fill_after > 0.15
+
+
+def test_kam_plan_tracking_is_available(cleaned_dataset) -> None:
+    """Key account managers carry quotas, so plan variance must work at KAM grain.
+
+    This requires kam_id on the order fact as well as the sales fact, since a
+    manager owns customers rather than order lines.
+    """
+    tables = cleaned_dataset.tables
+    weekly = summarise_by_period(tables, period="week", group_by=["kam_id"])
+
+    assert set(weekly["kam_id"]) == set(tables["dim_kam"]["kam_id"])
+    assert weekly["fill_rate"].notna().all()  # order metrics resolve per KAM
+
+    variance = variance_vs_target(
+        weekly,
+        tables["fact_kam_targets"],
+        "net_sales",
+        "sales_target",
+        period="week",
+        group_by=["kam_id"],
+    )
+    assert not variance.empty
+    assert variance["comparison_value"].notna().all()
+    # Quotas separate managers rather than failing all of them together.
+    assert (variance["variance"] > 0).any()
+    assert (variance["variance"] < 0).any()
+
+
+def test_kam_enrichment_does_not_multiply_order_lines(cleaned_dataset) -> None:
+    """Attributing orders to a manager must not change the order fact's grain."""
+    tables = cleaned_dataset.tables
+    weekly = summarise_by_period(tables, period="week", group_by=["kam_id"])
+    total = summarise_by_period(tables, period="week")
+
+    assert weekly["ordered_units"].sum() == total["ordered_units"].sum()
+    assert weekly["order_count"].sum() == total["order_count"].sum()

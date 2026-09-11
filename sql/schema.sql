@@ -123,8 +123,25 @@ CREATE TABLE fact_targets (
     FOREIGN KEY (region_code) REFERENCES dim_region(region_code)
 );
 
+-- Grain: one date x key account manager quota.
+-- KAM quotas are a separate planning artifact from the commercial plan in
+-- fact_targets: a KAM owns a portfolio of customers rather than a region or
+-- a category, so forcing the quota into that grain would leave most
+-- combinations empty.
+-- Key must match validation.contracts.TABLE_CONTRACTS['fact_kam_targets'].
+CREATE TABLE fact_kam_targets (
+    date DATE NOT NULL,
+    kam_id TEXT NOT NULL,
+    sales_target REAL NOT NULL CHECK (sales_target >= 0),
+    order_target INTEGER NOT NULL CHECK (order_target >= 0),
+    PRIMARY KEY (date, kam_id),
+    FOREIGN KEY (date) REFERENCES dim_date(date),
+    FOREIGN KEY (kam_id) REFERENCES dim_kam(kam_id)
+);
+
 CREATE INDEX idx_sales_date_region ON fact_sales(date, region_code);
 CREATE INDEX idx_sales_sku ON fact_sales(sku_id);
 CREATE INDEX idx_orders_date_region ON fact_orders(date, region_code);
 CREATE INDEX idx_inventory_date_region ON fact_inventory(date, region_code);
 CREATE INDEX idx_targets_date_region ON fact_targets(date, region_code);
+CREATE INDEX idx_kam_targets_date ON fact_kam_targets(date);
