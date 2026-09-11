@@ -45,6 +45,10 @@ RATE_COMPONENTS = {
     "fill_rate": ("fulfilled_units", "ordered_units"),
     "cancellation_rate": ("cancelled_units", "ordered_units"),
     "aov": ("net_sales", "sales_order_count"),
+    # Goods sent back as a share of goods sold. A different phenomenon from
+    # fill rate and never a substitute for it: a return is a customer changing
+    # their mind, not a warehouse failing to ship.
+    "return_rate": ("returned_units", "sold_units"),
 }
 
 # Below this ratio of net movement to gross movement, segment shares stop being
@@ -181,12 +185,43 @@ def decompose_additive(
     return _finalise(frame, metric, dims, current, comparison)
 
 
+def _fold_thin_segments(frame: pd.DataFrame, min_share: float) -> pd.DataFrame:
+    """Combine segments too small to carry a meaningful rate into one bucket.
+
+    A segment with almost no volume can still show an enormous rate movement,
+    and because a rate decomposition weights by share of the denominator, a
+    handful of near-empty segments can dominate the mix effect and invert the
+    conclusion.
+
+    They are combined rather than dropped. Their numerators and denominators are
+    added, so the rebuilt rate is correct and the contributions still reconstruct
+    the observed movement exactly; dropping them would break both.
+    """
+    if min_share <= 0:
+        return frame
+
+    total_after = frame["denominator_after"].sum()
+    total_before = frame["denominator_before"].sum()
+    share_after = frame["denominator_after"] / total_after if total_after else 0
+    share_before = frame["denominator_before"] / total_before if total_before else 0
+    thin = (share_after < min_share) & (share_before < min_share)
+
+    if thin.sum() < 2:
+        return frame
+
+    kept = frame.loc[~thin]
+    folded = frame.loc[thin].sum(numeric_only=True).to_frame().T
+    folded.index = pd.Index(["Other (below volume floor)"] * len(folded), name=frame.index.name)
+    return pd.concat([kept, folded])
+
+
 def decompose_rate(
     summary: pd.DataFrame,
     metric: str,
     dimension: Sequence[str],
     current_period: object | None = None,
     comparison_period: object | None = None,
+    min_share: float = 0.0,
 ) -> pd.DataFrame:
     """Split a rate movement into rate, mix and interaction effects.
 
@@ -208,6 +243,17 @@ def decompose_rate(
     A segment with no volume in one period has no rate there; its rate is held
     equal to the other period's, so its entire movement lands in mix, which is
     what entering or leaving demand actually is.
+
+    ``min_share`` folds segments below a share of total volume into one bucket.
+    Near-empty segments swing wildly between periods while carrying a weight
+    close to zero, so they feed noise into the mix effect without saying
+    anything about the business.
+
+    They are folded and never filtered. Dropping them would remove volume from
+    the denominator, which changes every remaining weight and therefore the
+    movement being explained. Folding adds their numerators and denominators
+    together, so the total is untouched and the effects still reconstruct the
+    observed change exactly.
     """
     if metric not in RATE_COMPONENTS:
         raise ValueError(
@@ -231,6 +277,7 @@ def decompose_rate(
             "denominator_before": before[denominator],
         }
     ).fillna(0.0)
+    frame = _fold_thin_segments(frame, min_share)
 
     total_after = float(frame["denominator_after"].sum())
     total_before = float(frame["denominator_before"].sum())
@@ -260,7 +307,48 @@ def decompose_rate(
     frame["contribution"] = (
         frame["rate_effect"] + frame["mix_effect"] + frame["interaction_effect"]
     )
+    _assert_reconstructs(frame, metric, denominator)
     return _finalise(frame, metric, dims, current, comparison)
+
+
+
+def _assert_reconstructs(frame: pd.DataFrame, metric: str, denominator: str) -> None:
+    """Refuse to return effects that do not add back to the observed movement.
+
+    The identity ``total rate = sum(weight * rate)`` needs every unit of the
+    numerator to sit behind some denominator. Real data supplies the exception:
+    goods returned in a month that sold nothing in that segment put a numerator
+    against a zero denominator, so the segment is weighted at zero and its
+    numerator drops out of the reconstruction.
+
+    The effects would still look plausible. They would simply explain a movement
+    that did not happen, which is worse than an error.
+    """
+    total_after = float(frame["denominator_after"].sum())
+    total_before = float(frame["denominator_before"].sum())
+    observed = (
+        float(frame["numerator_after"].sum()) / total_after
+        - float(frame["numerator_before"].sum()) / total_before
+    )
+    reconstructed = float(frame["contribution"].sum())
+    if abs(observed - reconstructed) <= 1e-9 + 1e-6 * abs(observed):
+        return
+
+    stranded = frame.index[
+        ((frame["denominator_after"] == 0) & (frame["numerator_after"] != 0))
+        | ((frame["denominator_before"] == 0) & (frame["numerator_before"] != 0))
+    ]
+    detail = (
+        f" Segments carry a '{metric}' numerator with no '{denominator}' behind it: "
+        f"{sorted(str(name) for name in stranded)[:5]}. A volume floor (min_share) "
+        "folds them into a segment that has volume, which restores the identity."
+        if len(stranded)
+        else ""
+    )
+    raise ValueError(
+        f"Decomposing '{metric}' does not reconstruct the movement: "
+        f"observed {observed:+.6f}, effects sum to {reconstructed:+.6f}.{detail}"
+    )
 
 
 def decompose_movement(
@@ -269,10 +357,13 @@ def decompose_movement(
     dimension: Sequence[str],
     current_period: object | None = None,
     comparison_period: object | None = None,
+    min_share: float = 0.0,
 ) -> pd.DataFrame:
     """Decompose a movement, choosing the method the metric requires."""
     if metric in RATE_COMPONENTS:
-        return decompose_rate(summary, metric, dimension, current_period, comparison_period)
+        return decompose_rate(
+            summary, metric, dimension, current_period, comparison_period, min_share
+        )
     return decompose_additive(summary, metric, dimension, current_period, comparison_period)
 
 

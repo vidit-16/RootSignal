@@ -119,6 +119,123 @@ property of the business.
 **83.5% to the United Kingdom**, with the Netherlands, Australia and Singapore
 offsetting slightly — a concentration a reader could act on.
 
+### The return rate, and two ways of reading it wrongly
+
+Returns are the one non-sales metric this dataset genuinely supports, so the
+rate decomposition was extended to cover them. A return rate behaves exactly
+like a fill rate arithmetically — a weighted average of segment rates — so it
+splits into a rate effect, a mix effect and an interaction the same way. It is
+not a fill rate and is never reported as one; the pattern vocabulary built for
+fulfilment does not apply, because the reasons goods come back are not in this
+data and naming them would be invention.
+
+Getting a defensible number out of it took two corrections, and both are
+recorded because both produced a confident and wrong answer first.
+
+**Filtering thin segments changes the answer.** Forty countries appear, and most
+carry a handful of units where a rate swings from 75% to 0% without meaning
+anything. The obvious response is to drop them. Dropping removes volume from the
+denominator, which changes the weight of every country that remains, and so
+changes the movement being explained. A first pass that filtered to countries
+above 500 units reported the rate effect at 89% of the movement. That number
+described a business with a different volume distribution from the real one.
+
+Thin segments are now **folded** into `Other (below volume floor)`: their
+numerators and denominators are added together, so the weights and the total are
+untouched and the effects still reconstruct the observed movement exactly.
+
+**The last month is not a month.** The file stops on 9 December 2011. Returns
+keep arriving against goods bought in November, so December shows returns
+against nine days of sales — a 24-point jump that is a calendar artifact rather
+than a change in behaviour. The period completeness metadata already existed for
+exactly this case; the external script now uses it.
+
+With both corrected, comparing the last two complete months:
+
+| Component | Net | Coherence | Share |
+| --- | --- | --- | --- |
+| **rate_effect** | **−0.0538** | **0.92** | **87.3%** |
+| mix_effect | +0.0049 | 0.63 | 7.9% |
+| interaction_effect | −0.0030 | 0.54 | 4.8% |
+
+The return rate fell 5.19 points, and 87% of that is countries genuinely
+returning less rather than demand moving between them. A coherence of 0.92 says
+the rate effect moved in one direction across the business instead of cancelling
+out. The United Kingdom carries it: 10.9% returned to 4.5%.
+
+### A guard the real data earned
+
+While checking that, the decomposition was found to reconstruct −0.051933
+against an observed −0.051880. Small enough to dismiss as floating point. It was
+not floating point.
+
+The identity `total rate = Σ weight × rate` needs every unit of the numerator to
+sit behind some denominator. **The Czech Republic returned goods in a month it
+sold nothing.** That numerator counts toward the total rate, but its segment is
+weighted at zero, so it drops out of the reconstruction. The effects would still
+have looked entirely plausible — they would have explained a movement that did
+not happen, which is worse than an error.
+
+`decompose_rate` now verifies the reconstruction and refuses rather than
+returning effects that do not add back:
+
+```
+Decomposing 'return_rate' does not reconstruct the movement:
+observed -0.051880, effects sum to -0.051933.
+Segments carry a 'return_rate' numerator with no 'sold_units' behind it:
+['Czech Republic']. A volume floor (min_share) folds them into a segment
+that has volume, which restores the identity.
+```
+
+The same cause forced a fix one layer up: `returns_by_period` joined returns
+onto sales with a left join, which silently discarded returns arriving in a
+period that sold nothing — **708 units**. It is an outer join now, and asserts
+that no returned unit is lost across it.
+
+## Why no public dataset carries everything
+
+The obvious follow-up is whether a real dataset exists with all five facts, so
+the whole pipeline could run on real data. It almost certainly does not, and the
+reasons are structural rather than a matter of searching harder.
+
+**Targets are trade secrets.** This is the hard blocker. Sales forecasts and
+plans are legally protected as proprietary precisely because they reveal
+strategy, cost structure and product direction to competitors. The
+budget-versus-actual datasets that do circulate on Kaggle and Hugging Face are
+explicitly dummy data built for teaching, not real company plans. A dataset can
+have real transactions or plausible targets; not both.
+
+**A fill rate publishes your failures.** In-full delivery needs ordered quantity
+against shipped quantity, line by line. No company releases "we failed to
+deliver 8% of what customers asked for". The closest public data reaches is the
+*on-time* half of OTIF — DataCo Smart Supply Chain carries scheduled against
+actual shipping days, and Olist carries estimated against actual delivery dates.
+Neither carries in-full.
+
+**Stock positions expose capacity.** Daily inventory by product and location
+reveals warehouse capacity, supplier relationships and buying patterns, so it
+stays internal.
+
+### Which is why a generated dataset is the right tool, not a fallback
+
+Even a complete real dataset would be unusable for the thing that matters most.
+**A detector cannot be validated against data whose true answer is unknown.**
+The four-scenario evaluation — three of three classified correctly at a medium
+confidence floor, zero false alarms at a high one — is only possible because the
+ground truth was planted. Run the engine on real data and you get a signal with
+no way to score it.
+
+So the two datasets answer two different questions, and neither could answer the
+other's:
+
+| Question | Answered by |
+| --- | --- |
+| Does the pipeline survive messy real data? | Online Retail II |
+| Does the engine tell causes apart? | Generated data, with known ground truth |
+
+The generated dataset is not a stand-in for real data that could not be found.
+It is the only kind of data that can measure whether a diagnosis is correct.
+
 ## Limitations
 
 1. **Half the system is not exercised.** Fill rate, inventory, targets, KAM

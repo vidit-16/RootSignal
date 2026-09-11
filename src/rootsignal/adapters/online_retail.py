@@ -30,6 +30,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from ..analysis.periods import (
+    PERIOD_COLUMN,
+    add_period_column,
+    attach_period_completeness,
+    drop_partial_periods,
+)
 from .base import AdaptedDataset, DatasetCapabilities, empty_fact
 
 DOWNLOAD_URL = "https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip"
@@ -45,9 +51,9 @@ CAPABILITIES = DatasetCapabilities(
         "are not in this dataset, so fulfilment, inventory and target analysis "
         "are unavailable rather than estimated.",
         "Returns appear as negative quantities and as invoices prefixed with C. "
-        "They are separated out and reported as returns, never as unfulfilled "
-        "demand: a customer sending goods back is not a warehouse failing to "
-        "ship them.",
+        "They are separated out and reported as a return rate, never as a fill "
+        "rate: a customer sending goods back is not a warehouse failing to ship. "
+        "The two would look identical as a number and mean opposite things.",
         "Country stands in for region. It is a real dimension in this data, but "
         "it is a market rather than a distribution geography.",
         "Product category is not recorded. A coarse category is derived from the "
@@ -308,3 +314,78 @@ def _build_dim_customer(sales: pd.DataFrame) -> pd.DataFrame:
 def _build_dim_region(sales: pd.DataFrame) -> pd.DataFrame:
     regions = sorted(sales["region_code"].dropna().astype(str).unique())
     return pd.DataFrame({"region_code": regions, "city": regions, "zone": regions})
+
+
+def returns_by_period(
+    sales: pd.DataFrame,
+    returns: pd.DataFrame,
+    period: str = "month",
+    group_by: list[str] | None = None,
+    include_partial_periods: bool = False,
+) -> pd.DataFrame:
+    """Units sold against units returned, at a chosen period and grain.
+
+    Shaped so the rate decomposition can work on it: the return rate is a
+    weighted average of segment return rates, exactly as a fill rate is, so it
+    separates into a rate effect and a mix effect the same way. A region can
+    return a larger share while every segment improves, if demand moved toward
+    products that are returned more often.
+
+    This is a returns metric throughout. It is not a fill rate, and the pattern
+    vocabulary built for fulfilment does not apply to it: the reasons goods come
+    back are not in this data, and naming them would be invention.
+
+    Partial periods are dropped by default, matching ``summarise_by_period``.
+    Returns matter more here than anywhere else in the pipeline: goods bought in
+    one month come back in the next, so a truncated final month accumulates
+    returns against a fraction of its sales. On this dataset, which stops on
+    9 December 2011, keeping it reports a 24-point jump in the return rate that
+    is a calendar artifact.
+
+    Completeness is judged against the window the dataset observes at all,
+    which spans both facts: a return can land in a month that sold nothing, and
+    that month is still observed.
+    """
+    groups = list(group_by or [])
+    sold = add_period_column(sales, period)
+    sold = sold.groupby([PERIOD_COLUMN, *groups], as_index=False).agg(sold_units=("units", "sum"))
+
+    sent_back = returns.copy()
+    if "region_code" not in sent_back.columns and "Country" in sent_back.columns:
+        sent_back = sent_back.rename(columns={"Country": "region_code"})
+    sent_back = add_period_column(sent_back, period)
+    sent_back = sent_back.groupby([PERIOD_COLUMN, *groups], as_index=False).agg(
+        returned_units=("returned_units", "sum")
+    )
+
+    # Outer, not left. Goods come back after they were bought, so a segment can
+    # return units in a month it sold nothing. A left join would drop those rows
+    # and quietly understate returns: 708 units on the real dataset.
+    combined = sold.merge(sent_back, on=[PERIOD_COLUMN, *groups], how="outer", validate="one_to_one")
+    for column in ("sold_units", "returned_units"):
+        combined[column] = pd.to_numeric(combined[column], errors="coerce").fillna(0.0)
+
+    returned_in = float(sent_back["returned_units"].sum())
+    returned_out = float(combined["returned_units"].sum())
+    if abs(returned_in - returned_out) > 1e-6:
+        raise ValueError(
+            f"Returned units changed during the period join: {returned_in:,.0f} to {returned_out:,.0f}."
+        )
+
+    # Left undefined where nothing was sold. A rate needs a denominator, and
+    # filling it with zero would read as "nothing was returned".
+    combined["return_rate"] = (
+        combined["returned_units"] / combined["sold_units"].where(combined["sold_units"] != 0)
+    ).round(4)
+
+    sales_dates = pd.to_datetime(sales["date"])
+    return_dates = pd.to_datetime(returns["date"])
+    combined = attach_period_completeness(
+        combined,
+        period,
+        min(sales_dates.min(), return_dates.min()),
+        max(sales_dates.max(), return_dates.max()),
+    )
+    if not include_partial_periods:
+        combined = drop_partial_periods(combined)
+    return combined.sort_values([PERIOD_COLUMN, *groups]).reset_index(drop=True)

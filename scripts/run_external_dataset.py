@@ -15,10 +15,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from rootsignal.adapters.online_retail import adapt, returns_frame
+from rootsignal.adapters.online_retail import adapt, returns_by_period, returns_frame
 from rootsignal.analysis import calculate_trend, summarise_by_period
 from rootsignal.cleaning import clean_dataset
-from rootsignal.decomposition import decompose_additive, rank_drivers, total_movement
+from rootsignal.decomposition import (
+    component_coherence,
+    decompose_additive,
+    decompose_movement,
+    rank_drivers,
+    total_movement,
+)
 from rootsignal.forecasting import (
     build_daily_series,
     compare_against_baseline,
@@ -76,7 +82,38 @@ def main() -> None:
     return_rate = returns["returned_units"].sum() / max(sales["units"].sum(), 1)
     print(f"{len(returns):,} returned lines, {returns['returned_units'].sum():,.0f} units.")
     print(f"Returned units as a share of units sold: {return_rate:.2%}")
-    print("This is a returns rate. It is not a fill rate, and the two must not be read as the same thing.")
+    print("This is a return rate. It is not a fill rate, and the two must not be read as the same thing.")
+
+    heading("Why the return rate moved")
+    # Countries carrying almost no volume swing between 0% and 75% and would
+    # otherwise dominate the mix effect. They are folded into one bucket rather
+    # than filtered out: removing volume would change every remaining weight and
+    # so change the movement being explained.
+    # The partial final month is dropped inside returns_by_period: the file stops
+    # on 9 December 2011, and returns keep arriving against a month that sold
+    # only nine days of goods.
+    returns_monthly = returns_by_period(sales, returns, period="month", group_by=["region_code"])
+    rate_split = decompose_movement(
+        returns_monthly, "return_rate", ["region_code"], min_share=0.01
+    )
+    moved = total_movement(rate_split)
+    print(f"Latest month moved {moved:+.4f} ({moved:+.2%})")
+    print()
+    print(
+        component_coherence(rate_split)[
+            ["component", "net", "gross", "coherence", "share_of_net_movement"]
+        ].to_string(index=False)
+    )
+    print(
+        "\nrate = segments genuinely returning more   "
+        "mix = demand moved toward segments that always returned more"
+    )
+    print()
+    print(
+        rank_drivers(rate_split, "absolute", 5)[
+            ["rank", "segment", "rate_before", "rate_after", "contribution"]
+        ].to_string(index=False)
+    )
 
     heading("Monthly trade")
     monthly = summarise_by_period(tables, period="month")
@@ -123,6 +160,7 @@ def main() -> None:
         monthly.to_csv(output / "external_monthly.csv", index=False)
         accuracy.to_csv(output / "external_forecast_accuracy.csv", index=False)
         decomposition.to_csv(output / "external_country_contribution.csv", index=False)
+        rate_split.to_csv(output / "external_return_rate_split.csv", index=False)
         print(f"\nWrote results to {output}")
 
     print(f"\nCompleted in {time.time() - started:.1f}s.")

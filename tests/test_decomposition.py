@@ -390,3 +390,141 @@ def test_decompose_movement_dispatches_on_metric_type(cleaned_dataset) -> None:
 
     assert "rate_effect" not in additive.columns
     assert "rate_effect" in rate.columns
+
+
+# --------------------------------------------------------------------------
+# A volume floor for thin segments
+# --------------------------------------------------------------------------
+
+
+def thin_segment_summary() -> pd.DataFrame:
+    """One large segment and several near-empty ones with wild rates.
+
+    The shape real data takes: a dominant market plus a long tail of countries
+    carrying a handful of units, where a rate can swing from 0.75 to 0 without
+    meaning anything.
+    """
+    rows = [
+        {"period_start": WEEK_1, "region_code": "BIG", "returned_units": 880.0, "sold_units": 10000.0},
+        {"period_start": WEEK_2, "region_code": "BIG", "returned_units": 970.0, "sold_units": 10000.0},
+    ]
+    for name, before, after in (("TINY_A", 3.0, 0.0), ("TINY_B", 2.0, 0.0), ("TINY_C", 4.0, 0.0)):
+        rows.append({"period_start": WEEK_1, "region_code": name, "returned_units": before, "sold_units": 4.0})
+        rows.append({"period_start": WEEK_2, "region_code": name, "returned_units": after, "sold_units": 4.0})
+    return summary(rows)
+
+
+def test_a_volume_floor_folds_thin_segments_without_dropping_them() -> None:
+    """Folding preserves the movement; dropping would change the weights.
+
+    A rate decomposition weights by share of the denominator, so removing
+    volume silently changes every weight and can invert which component appears
+    to dominate. The thin segments are combined, not discarded.
+    """
+    frame = thin_segment_summary()
+
+    everything = decompose_rate(frame, "return_rate", ["region_code"])
+    folded = decompose_rate(frame, "return_rate", ["region_code"], min_share=0.05)
+
+    assert len(folded) < len(everything)
+    assert "Other (below volume floor)" in set(folded["segment"])
+    # The observed movement is unchanged: this is a regrouping, not a filter.
+    assert total_movement(folded) == pytest.approx(total_movement(everything))
+
+
+def test_thin_segments_can_invert_which_component_appears_to_dominate() -> None:
+    """Why the floor exists at all.
+
+    Segments carrying almost no volume swing wildly and are weighted near zero,
+    so they feed noise into mix while saying nothing about the business.
+    """
+    frame = thin_segment_summary()
+
+    unfiltered = component_coherence(decompose_rate(frame, "return_rate", ["region_code"]))
+    floored = component_coherence(
+        decompose_rate(frame, "return_rate", ["region_code"], min_share=0.05)
+    )
+
+    # The tail contributes a mix effect that shrinks once it is pooled.
+    tail_mix = float(unfiltered.loc[unfiltered["component"] == "mix_effect", "gross"].iloc[0])
+    pooled_mix = float(floored.loc[floored["component"] == "mix_effect", "gross"].iloc[0])
+    assert pooled_mix <= tail_mix
+
+
+def test_a_floor_that_excludes_nothing_changes_nothing() -> None:
+    frame = thin_segment_summary()
+    pd.testing.assert_frame_equal(
+        decompose_rate(frame, "return_rate", ["region_code"]),
+        decompose_rate(frame, "return_rate", ["region_code"], min_share=0.0),
+    )
+
+
+def test_return_rate_is_a_recognised_rate_but_not_a_fill_rate() -> None:
+    """Returns and fulfilment are different phenomena with the same arithmetic."""
+    from rootsignal.decomposition.contribution import RATE_COMPONENTS
+
+    assert RATE_COMPONENTS["return_rate"] == ("returned_units", "sold_units")
+    assert RATE_COMPONENTS["fill_rate"] != RATE_COMPONENTS["return_rate"]
+
+
+def test_effects_that_do_not_add_back_are_refused() -> None:
+    """Plausible-looking effects that explain a movement which did not happen.
+
+    Found on real data: a country returned goods in a month it sold nothing.
+    Its numerator has no denominator behind it, so it is weighted at zero and
+    drops out of the reconstruction while still counting toward the total.
+    """
+    frame = summary(
+        [
+            {"period_start": WEEK_1, "region_code": "NORTH", "returned_units": 50.0, "sold_units": 1000.0},
+            {"period_start": WEEK_2, "region_code": "NORTH", "returned_units": 60.0, "sold_units": 1000.0},
+            # Sold nothing this week, but goods bought earlier came back.
+            {"period_start": WEEK_1, "region_code": "SOUTH", "returned_units": 0.0, "sold_units": 0.0},
+            {"period_start": WEEK_2, "region_code": "SOUTH", "returned_units": 40.0, "sold_units": 0.0},
+        ]
+    )
+
+    with pytest.raises(ValueError, match="does not reconstruct the movement"):
+        decompose_rate(frame, "return_rate", ["region_code"])
+
+
+def test_the_refusal_names_the_segment_and_the_remedy() -> None:
+    frame = summary(
+        [
+            {"period_start": WEEK_1, "region_code": "NORTH", "returned_units": 50.0, "sold_units": 1000.0},
+            {"period_start": WEEK_2, "region_code": "NORTH", "returned_units": 60.0, "sold_units": 1000.0},
+            {"period_start": WEEK_1, "region_code": "SOUTH", "returned_units": 0.0, "sold_units": 0.0},
+            {"period_start": WEEK_2, "region_code": "SOUTH", "returned_units": 40.0, "sold_units": 0.0},
+        ]
+    )
+
+    with pytest.raises(ValueError) as caught:
+        decompose_rate(frame, "return_rate", ["region_code"])
+
+    message = str(caught.value)
+    assert "SOUTH" in message
+    assert "sold_units" in message
+    assert "min_share" in message
+
+
+def test_folding_a_stranded_segment_restores_the_identity() -> None:
+    """The remedy the message points at actually works.
+
+    Folded into a bucket that has volume, the stranded numerator is once again
+    weighted by a real denominator.
+    """
+    frame = summary(
+        [
+            {"period_start": WEEK_1, "region_code": "NORTH", "returned_units": 50.0, "sold_units": 1000.0},
+            {"period_start": WEEK_2, "region_code": "NORTH", "returned_units": 60.0, "sold_units": 1000.0},
+            {"period_start": WEEK_1, "region_code": "SOUTH", "returned_units": 0.0, "sold_units": 0.0},
+            {"period_start": WEEK_2, "region_code": "SOUTH", "returned_units": 40.0, "sold_units": 0.0},
+            {"period_start": WEEK_1, "region_code": "TINY", "returned_units": 1.0, "sold_units": 5.0},
+            {"period_start": WEEK_2, "region_code": "TINY", "returned_units": 1.0, "sold_units": 5.0},
+        ]
+    )
+
+    folded = decompose_rate(frame, "return_rate", ["region_code"], min_share=0.05)
+
+    observed = (101.0 / 1005.0) - (51.0 / 1005.0)  # 60 + 40 + 1 against 50 + 0 + 1
+    assert total_movement(folded) == pytest.approx(observed)

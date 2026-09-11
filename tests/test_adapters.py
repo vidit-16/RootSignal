@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from rootsignal.adapters import ANALYSIS_REQUIREMENTS, DatasetCapabilities, empty_fact
-from rootsignal.adapters.online_retail import adapt, returns_frame
+from rootsignal.adapters.online_retail import adapt, returns_by_period, returns_frame
 from rootsignal.analysis import calculate_trend, summarise_by_period
 from rootsignal.cleaning import clean_dataset
 from rootsignal.decomposition import decompose_additive, total_movement
@@ -239,3 +239,100 @@ def test_trend_analysis_runs_on_adapted_data() -> None:
     daily = summarise_by_period(tables, period="day")
     trend = calculate_trend(daily, "net_sales")
     assert len(trend) == max(len(daily) - 1, 0)
+
+
+# --------------------------------------------------------------------------
+# Returns as a rate of their own
+# --------------------------------------------------------------------------
+
+
+def returns_fixture() -> tuple[pd.DataFrame, pd.DataFrame]:
+    dataset = adapt(raw=raw_lines())
+    sales = clean_dataset(dataset.tables).tables["fact_sales"]
+    return sales, returns_frame(raw=raw_lines())
+
+
+def test_returns_are_measured_against_what_was_sold() -> None:
+    """A count of returns says nothing on its own; a share of sales does."""
+    sales, returns = returns_fixture()
+    # The fixture spans three days, so every period in it is partial.
+    by_period = returns_by_period(sales, returns, period="month", include_partial_periods=True)
+
+    assert {"sold_units", "returned_units", "return_rate"} <= set(by_period.columns)
+    assert by_period["sold_units"].sum() == sales["units"].sum()
+
+
+def test_returns_arriving_after_the_sale_are_not_dropped() -> None:
+    """Goods come back later, sometimes into a period that sold nothing.
+
+    A left join from sales would silently discard those returns and understate
+    the rate. On the real dataset it lost 708 units.
+    """
+    sales, returns = returns_fixture()
+    # Push the return into a month with no sales in that segment.
+    returns = returns.copy()
+    returns["date"] = pd.Timestamp("2010-06-15")
+
+    by_period = returns_by_period(
+        sales, returns, period="month", group_by=["region_code"], include_partial_periods=True
+    )
+
+    assert by_period["returned_units"].sum() == returns["returned_units"].sum()
+    orphan = by_period[by_period["sold_units"] == 0]
+    assert not orphan.empty
+    assert orphan["return_rate"].isna().all(), "a rate with no denominator is undefined, not zero"
+
+
+def test_a_return_rate_decomposes_like_any_other_rate() -> None:
+    """Returns move for two different reasons and the split matters.
+
+    A region can return a larger share while every product improves, purely
+    because demand shifted toward products that are returned more often.
+    """
+    from rootsignal.decomposition import decompose_movement
+
+    sold = pd.DataFrame(
+        {
+            "period_start": pd.to_datetime(
+                ["2010-01-01", "2010-01-01", "2010-02-01", "2010-02-01"]
+            ),
+            "region_code": ["United Kingdom", "France", "United Kingdom", "France"],
+            "sold_units": [1000.0, 1000.0, 1500.0, 500.0],
+            "returned_units": [50.0, 150.0, 75.0, 75.0],
+        }
+    )
+    sold["return_rate"] = sold["returned_units"] / sold["sold_units"]
+
+    decomposition = decompose_movement(sold, "return_rate", ["region_code"])
+
+    # Every segment held its own rate; the total still moved, through mix alone.
+    assert decomposition["rate_effect"].abs().sum() == pytest.approx(0.0, abs=1e-9)
+    assert decomposition["mix_effect"].abs().sum() > 0
+    observed = (sold[sold["period_start"] == "2010-02-01"]["returned_units"].sum() / 2000) - (
+        sold[sold["period_start"] == "2010-01-01"]["returned_units"].sum() / 2000
+    )
+    assert decomposition["contribution"].sum() == pytest.approx(observed)
+
+
+def test_a_return_rate_is_never_reported_as_a_fill_rate() -> None:
+    """The adapter says so in its notes, because the confusion is the easy mistake."""
+    dataset = adapt(raw=raw_lines())
+    notes = " ".join(dataset.capabilities.notes).lower()
+
+    assert "fill rate" in notes
+    assert not dataset.capabilities.supports("fulfilment_analysis")
+
+
+def test_a_truncated_final_period_is_dropped_by_default() -> None:
+    """Returns lag sales, so a cut-off month accumulates them against part of a month.
+
+    On the real dataset, which stops on 9 December 2011, keeping that month
+    reports a 24-point jump in the return rate that is a calendar artifact.
+    """
+    sales, returns = returns_fixture()
+
+    kept = returns_by_period(sales, returns, period="month", include_partial_periods=True)
+    dropped = returns_by_period(sales, returns, period="month")
+
+    assert not kept.empty
+    assert dropped.empty, "three days of December is not a December"
