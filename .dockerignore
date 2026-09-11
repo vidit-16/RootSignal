@@ -13,13 +13,20 @@ data/raw/external
 
 # Build outputs, not inputs.
 reports
-*.xlsx
+**/*.xlsx
 
-__pycache__
-*.py[cod]
-.pytest_cache
-.ruff_cache
-*.egg-info
+# These need the ** prefix. A .dockerignore pattern is matched against the
+# whole path, so a bare __pycache__ excludes only one at the context root and
+# lets src/rootsignal/__pycache__ and tests/__pycache__ through. Bytecode
+# copied in that way was compiled on the developer's machine, and COPY
+# preserves mtimes, so CPython loads it in preference to the source shipped
+# beside it -- the image would then test the host's bytecode rather than its
+# own source, which is the one thing running the suite in here is for.
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
 .venv
 venv
 .env
