@@ -94,14 +94,6 @@ The two controls disagree, and that is the more useful number. One raises three
 false alarms at a medium floor and the other six, so the rate varies two-fold
 between windows that both have nothing planted in them.
 
-The evaluation used to carry a single control and reported half that total, which
-read better and showed less. Two controls is enough to establish that the spread
-is real and not enough to size it, and there is no principled stopping point short
-of many — so the honest description of that number is a measurement with a known
-width rather than a result. It is quoted here at its widest because a figure that
-only appears in its flattering form is the thing this project exists to argue
-against.
-
 ## Quick start
 
 Either install it:
