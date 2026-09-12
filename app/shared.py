@@ -123,7 +123,7 @@ def sidebar(show_period: bool = True) -> tuple[str, str]:
 def metric_row(headline: dict, keys: list[tuple[str, str, str]]) -> None:
     """Render headline figures with their movement against the prior period."""
     columns = st.columns(len(keys))
-    for column, (key, label, fmt) in zip(columns, keys):
+    for column, (key, label, fmt) in zip(columns, keys, strict=True):
         entry = headline.get(key)
         if entry is None:
             column.metric(label, "n/a")

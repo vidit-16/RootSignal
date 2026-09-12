@@ -247,7 +247,7 @@ def _root_signal_report(
     # shows, so the prose and the numbers cannot drift apart.
     packages = [signal.as_dict() for signal in signals]
     briefing_rows = [{"section": "Summary", "segment": "", "text": write_summary(packages, tables)}]
-    for signal, entry in zip(signals, packages):
+    for signal, entry in zip(signals, packages, strict=True):
         briefing = write_briefing(entry, tables)
         for section, text in briefing.as_dict().items():
             if section == "caveats" or not text:

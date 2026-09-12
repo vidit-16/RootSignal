@@ -110,7 +110,7 @@ def test_tracker_figures_match_the_analytical_layer(cleaned_dataset, tmp_path) -
     path = build_report("daily_sales_tracker", tables, tmp_path)
 
     rows = list(load_workbook(path)["Daily tracker"].iter_rows(values_only=True))
-    header, first = rows[0], dict(zip(rows[0], rows[1]))
+    header, first = rows[0], dict(zip(rows[0], rows[1], strict=True))
     source = summarise_by_period(tables, period="day").iloc[0]
 
     assert "date" in header

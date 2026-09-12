@@ -38,8 +38,14 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-# Keep the baseline focused on correctness; formatting is handled separately.
-select = ["F"]
+# Correctness, not formatting. F is pyflakes; B is bugbear, which is where the
+# rules that catch real defects live rather than style opinions -- B905 (a zip
+# without strict= silently truncates to the shorter side, which in the signal
+# engine meant a weaker mask and quietly wrong rows) and B023 (a closure reading
+# a loop variable when it runs rather than when it was made).
+#
+# E is deliberately absent. It is 176 line-length complaints and no defects.
+select = ["F", "B"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

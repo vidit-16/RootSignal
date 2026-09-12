@@ -121,7 +121,7 @@ def summarise_inventory_by_period(
 
 def _segment_rows(summary: pd.DataFrame, dimension: Sequence[str], segment: Sequence[str]) -> pd.DataFrame:
     mask = pd.Series(True, index=summary.index)
-    for column, value in zip(list(dimension), list(segment)):
+    for column, value in zip(list(dimension), list(segment), strict=True):
         mask &= summary[column].astype(str) == str(value)
     return summary.loc[mask]
 

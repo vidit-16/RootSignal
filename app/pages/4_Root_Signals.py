@@ -126,8 +126,12 @@ for position, signal in enumerate(signals):
         briefing = write_briefing(signal.as_dict(), tables)
         st.markdown(briefing.as_markdown())
 
-        def readable_text(text: str) -> str:
-            return humanise_statement(text, signal.segment, names)
+        # segment is bound now rather than looked up when the closure runs.
+        # Every call happens inside this iteration today, so the late binding
+        # never bites -- but it would the moment one of these strings was built
+        # lazily or deferred to a callback, and it would be silently wrong.
+        def readable_text(text: str, segment: str = signal.segment) -> str:
+            return humanise_statement(text, segment, names)
 
         st.warning(
             f"**The other possibility:** {readable_text(signal.pattern.alternative_hypothesis)} "

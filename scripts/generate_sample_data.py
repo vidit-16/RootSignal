@@ -32,7 +32,7 @@ BASE_DAILY_ORDERS = 80
 BASKET_SIZE_CHOICES = (1, 2, 3)
 BASKET_SIZE_WEIGHTS = (0.62, 0.26, 0.12)
 MEAN_BASKET_LINES = sum(
-    size * weight for size, weight in zip(BASKET_SIZE_CHOICES, BASKET_SIZE_WEIGHTS)
+    size * weight for size, weight in zip(BASKET_SIZE_CHOICES, BASKET_SIZE_WEIGHTS, strict=True)
 )
 
 # --- Planted scenarios ---------------------------------------------------
@@ -577,7 +577,7 @@ def centred_plan_bias(rng: np.random.Generator, keys, spread: float) -> dict:
     """
     draws = rng.normal(1.0, spread, size=len(keys))
     draws = draws - draws.mean() + 1.0
-    return dict(zip(keys, draws))
+    return dict(zip(keys, draws, strict=True))
 
 
 def weekday_plan_shape(dates: list[date]) -> dict[date, float]:

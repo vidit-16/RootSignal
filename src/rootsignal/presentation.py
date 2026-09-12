@@ -257,7 +257,7 @@ def build_name_lookup(tables: dict[str, pd.DataFrame]) -> dict[str, str]:
         frame = tables.get(table)
         if frame is None or key not in frame.columns or name not in frame.columns:
             continue
-        lookup.update(dict(zip(frame[key].astype(str), frame[name].astype(str))))
+        lookup.update(dict(zip(frame[key].astype(str), frame[name].astype(str), strict=True)))
     return lookup
 
 

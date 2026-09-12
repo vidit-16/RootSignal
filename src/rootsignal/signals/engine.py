@@ -105,7 +105,7 @@ def _typical_movement(
     threshold means a volatile segment must move further to look notable.
     """
     mask = pd.Series(True, index=summary.index)
-    for column, value in zip(list(dimension), list(segment)):
+    for column, value in zip(list(dimension), list(segment), strict=True):
         mask &= summary[column].astype(str) == str(value)
     rows = summary.loc[mask].sort_values(PERIOD_COLUMN)
     if metric not in rows.columns or len(rows) < 3:
@@ -120,7 +120,7 @@ def _typical_movement(
 
 def _segment_values(summary: pd.DataFrame, dimension: Sequence[str], segment: Sequence[str], period) -> pd.Series:
     mask = pd.to_datetime(summary[PERIOD_COLUMN]) == pd.Timestamp(period)
-    for column, value in zip(list(dimension), list(segment)):
+    for column, value in zip(list(dimension), list(segment), strict=True):
         mask &= summary[column].astype(str) == str(value)
     rows = summary.loc[mask]
     return rows.iloc[0] if len(rows) else pd.Series(dtype="float64")

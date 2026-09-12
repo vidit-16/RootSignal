@@ -34,6 +34,7 @@ for tab, (key, dimension, noun) in zip(
         ("by_channel", "channel", "channel"),
         ("by_kam", "kam_id", "account manager"),
     ],
+    strict=True,
 ):
     with tab:
         frame = views[key]
