@@ -13,7 +13,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        # pyproject declares >=3.12, so the top of that range has to be tested
+        # too. The container already proves the numpy range honest by resolving
+        # the top of it; this does the same for the Python range, and without it
+        # the floor was the only version anyone had ever run.
+        python-version: ["3.12", "3.13"]
 
     steps:
       - name: Checkout repository
