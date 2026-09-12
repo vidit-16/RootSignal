@@ -19,7 +19,7 @@ docker run --rm rootsignal pytest
 
 ```bash
 docker run --rm -p 8501:8501 rootsignal                 # the dashboard
-docker run --rm rootsignal pytest                       # all 307 tests
+docker run --rm rootsignal pytest                       # all 308 tests
 docker run --rm rootsignal python scripts/detect_signals.py
 ```
 
@@ -47,7 +47,7 @@ of the argument for having it.
 numpy 1.26.4 and pandas 2.2.2; a fresh install in the image resolves
 **numpy 2.5.3 and pandas 2.3.3**.
 
-All 307 tests pass on both. But under numpy 2.x the forecasting layer emitted
+All 308 tests pass on both. But under numpy 2.x the forecasting layer emitted
 380 deprecation warnings from a single line:
 
 ```python

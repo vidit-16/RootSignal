@@ -241,7 +241,8 @@ them:
 | `blr_supply_constraint` | BLR | Fulfilment and stock fall while demand holds | `fulfilment_constraint` |
 | `hyd_demand_softness` | HYD | Orders fall away; fulfilment stays healthy | `demand_softness` |
 | `del_mix_shift` | DEL | Demand tilts toward a structurally weaker category | `portfolio_mix_shift` |
-| `mum_control` | MUM | **Nothing** | Silence |
+| `mum_control` | MUM | **Nothing**, ever | Silence |
+| `blr_quiet_period_control` | BLR | **Nothing yet** — five weeks before the constraint | Silence |
 
 Ground truth travels with the data in `dataset_manifest.json`, so the evaluation
 cannot drift from what was actually generated. Reproduce with:
@@ -250,22 +251,36 @@ cannot drift from what was actually generated. Reproduce with:
 python scripts/evaluate_signals.py
 ```
 
-| Confidence floor | Correctly classified | Recall | False-alarm signals | Control silent |
+| Confidence floor | Correctly classified | Recall | False-alarm signals | Controls silent |
 | --- | --- | --- | --- | --- |
-| **high** | 2 of 3 | 0.67 | **0** | yes |
-| **medium** | **3 of 3** | **1.00** | 7 | no |
+| **high** | 2 of 3 | 0.67 | **0** | **2 of 2** |
+| **medium** | **3 of 3** | **1.00** | 12 | 0 of 2 |
 
 This is a precision/recall trade-off, measured rather than asserted. At a high
 floor the engine raises nothing it cannot support and stays completely silent on
-the control week, at the cost of missing the mix shift — the subtlest of the
-three. At a medium floor it classifies all three correctly and admits seven
+both control windows, at the cost of missing the mix shift — the subtlest of the
+three. At a medium floor it classifies all three correctly and admits twelve
 false alarms.
 
-**The control matters as much as the rest.** A detector that flags something
-every week is not detecting anything, so a region with nothing planted is scored
+**The controls matter as much as the rest.** A detector that flags something
+every week is not detecting anything, so a window with nothing planted is scored
 on whether the engine says nothing. `min_confidence` exists for that: without it
 the engine always returns its top segments, and a quiet week yields a ranked list
 of ordinary noise.
+
+There are two of them, and they are deliberately different. `mum_control` asks
+whether a segment that never moves stays silent. `blr_quiet_period_control` asks
+whether a segment that moves *later* stays silent until it does — Bengaluru is
+where the supply constraint eventually lands, and that window closes five weeks
+before it starts. A detector that smeared a real event backwards, or that found
+meaning in the run-up to one, would pass the first and fail the second. They also
+sit on different metrics, so a false positive confined to the fulfilment path or
+the demand path cannot hide behind the other.
+
+The second one earned its place immediately. It raises **six** false alarms at a
+medium floor against `mum_control`'s three, so the rate is not uniform and the
+single-control figure this table used to report was an estimate from one
+observation. Two is still few. It is enough to show the spread is real.
 
 ### Choosing the metric matters
 
@@ -305,7 +320,7 @@ discovered.
 7. **Inventory evidence is unavailable by customer, channel and manager**, so
    signals at those grains rest on demand and fulfilment evidence alone and are
    correspondingly weaker.
-8. **The evaluation covers four scenarios on one dataset.** Pricing, competitive,
+8. **The evaluation covers five scenarios on one dataset.** Pricing, competitive,
    seasonal and data-quality explanations are not planted and not modelled, and
    a recall of 1.00 across three planted situations is not a claim about
    behaviour on situations that were never tested.

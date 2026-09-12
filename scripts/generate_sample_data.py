@@ -122,7 +122,37 @@ SCENARIOS = [
         "metric": "fill_rate",
         "current_period": "2026-01-19",
         "comparison_period": "2026-01-12",
-        "description": "Nothing is planted here. Signals raised are false positives.",
+        "description": (
+            "Nothing is planted in Mumbai at all. A signal raised here is a false "
+            "positive from a segment that never moves."
+        ),
+    },
+    {
+        "name": "blr_quiet_period_control",
+        # A second control, and deliberately a different kind. mum_control asks
+        # whether a segment that never moves stays silent. This asks whether a
+        # segment that moves *later* stays silent until it does: Bengaluru is
+        # where the supply constraint eventually lands, and this window closes
+        # five weeks before it begins.
+        #
+        # The failure it catches is different too. A detector that smears a real
+        # event backwards, or that finds meaning in the run-up to one because the
+        # segment is interesting later, passes mum_control and fails here.
+        "region_code": SUPPLY_CONSTRAINT_REGION,
+        "categories": [],
+        "starts": None,
+        "expected_pattern": None,
+        # A different metric from the other control as well. Between them they
+        # cover the fulfilment path and the demand path, so a false positive
+        # confined to one of the two cannot hide behind the other.
+        "metric": "ordered_units",
+        "current_period": "2026-01-12",
+        "comparison_period": "2026-01-05",
+        "description": (
+            "Nothing is planted here either. The window closes five weeks before "
+            "the Bengaluru supply constraint begins, so any signal raised is a "
+            "false positive in the quiet run-up to a real event."
+        ),
     },
 ]
 

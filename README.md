@@ -77,14 +77,14 @@ Reproduced by the committed test suite and evaluation scripts.
 
 | | Result |
 | --- | --- |
-| **Scenario detection** | 4 situations planted (supply constraint, demand decline, mix shift, and a control where nothing happens). **3 of 3 correctly classified** at a medium confidence floor; **2 of 3 with zero false alarms and silence on the control** at a high floor |
+| **Scenario detection** | 5 situations planted (supply constraint, demand decline, mix shift, and two controls where nothing happens). **3 of 3 correctly classified** at a medium confidence floor; **2 of 3 with zero false alarms and silence on both controls** at a high floor |
 | **Real public data** | UCI Online Retail II, **1,044,420 invoice lines over 739 days**. 3 defects found in the published data, 2,590 unsellable lines quarantined, then **zero validation errors** |
 | **Forecast accuracy** | `seasonal_mean_7` beats naive by **+28.9%** WAPE on daily net sales and **+19.1%** on units; `ses` leads orders at **+22.2%**. On the real dataset, **+38.8%** across 49 folds — the same model wins on both |
 | **SQL / Python parity** | The commercial mart is implemented twice and a test asserts the two agree across **3,663 rows and 11 metric columns**. The SQL watchlist and the Python engine — sharing no code — independently flag the same two disrupted segments |
 | **Data quality** | **8 errors** detected across 10 raw tables; cleaning imputes 3 fields, drops 2 exact duplicates, quarantines 1 impossible line; **zero errors** after |
 | **Plan vs actual** | Attainment spans **87.4% to 125.6%** across 64 region/category/channel segments, evenly split 32 above plan and 32 below. KAM quota attainment runs **89.8% to 106.0%** across four managers, three ahead and one behind |
 | **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
-| **Tests** | **307 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+| **Tests** | **308 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
 
 ## Quick start
 
@@ -120,7 +120,7 @@ python scripts/run_external_dataset.py
 ```
 
 The first prints the worked example above; the second measures whether the
-engine tells the four scenarios apart; the third opens the dashboard; the fourth
+engine tells the five scenarios apart; the third opens the dashboard; the fourth
 runs the same pipeline against real public data.
 
 <details>
@@ -172,7 +172,7 @@ works fully without. Power BI is deliberately out of scope.
 | Layer | What it does | Docs |
 | --- | --- | --- |
 | Data model + SQL schema | Dimensions and facts with grains and composite keys enforced in both SQL and Python | [data_model.md](docs/data_model.md) |
-| Sample-data generator | Deterministic 60-day dataset (seed 42) with multi-SKU baskets, controlled defects, and four labelled scenarios | — |
+| Sample-data generator | Deterministic 60-day dataset (seed 42) with multi-SKU baskets, controlled defects, and five labelled scenarios | — |
 | Ingestion | CSV, Excel and database loading by table name | — |
 | Validation | Columns, keys, ranges, referential integrity, cross-table reconciliation | — |
 | Cleaning | Quarantine-first repair with a full audit trail | [cleaning.md](docs/cleaning.md) |
@@ -233,7 +233,7 @@ four planted scenarios — classifying three of three correctly at a medium
 confidence floor, with zero false alarms at a high one — and runs unchanged on
 a million real invoice lines from a public dataset, where it beats a naive
 forecast baseline by 38.8% across 49 backtest folds. Python, pandas, SQL,
-Streamlit; 307 tests, including one asserting that no output ever claims
+Streamlit; 308 tests, including one asserting that no output ever claims
 causation.
 
 </details>

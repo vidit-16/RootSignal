@@ -512,11 +512,33 @@ def test_scenario_ground_truth_travels_with_the_dataset(generated_dataset_dir) -
     scenarios = load_scenarios(generated_dataset_dir)
     names = {scenario["name"] for scenario in scenarios}
 
-    assert len(scenarios) == 4
-    assert "mum_control" in names  # a region with nothing planted
+    assert len(scenarios) == 5
+    assert {"mum_control", "blr_quiet_period_control"} <= names, "both controls"
     for scenario in scenarios:
         assert scenario["metric"]
         assert scenario["current_period"] and scenario["comparison_period"]
+
+
+def test_the_dataset_carries_more_than_one_control(generated_dataset_dir) -> None:
+    """A false-positive rate measured on one window is an estimate from n=1.
+
+    The two controls are deliberately unalike. mum_control is a region where
+    nothing is ever planted; blr_quiet_period_control is the run-up to a region
+    that does move later, on a different metric. A detector that smeared a real
+    event backwards would pass the first and fail the second.
+
+    They disagree in practice -- one raises twice as many false alarms as the
+    other at a medium floor -- which is the point. One control could not have
+    shown that.
+    """
+    scenarios = load_scenarios(generated_dataset_dir)
+    controls = [s for s in scenarios if s["expected_pattern"] is None]
+
+    assert len(controls) >= 2, "a single control cannot show the spread"
+    assert len({c["region_code"] for c in controls}) > 1, "different regions"
+    assert len({c["metric"] for c in controls}) > 1, "different metrics"
+    for control in controls:
+        assert control["starts"] is None and not control["categories"]
 
 
 def test_missing_manifest_is_reported_rather_than_assumed(tmp_path) -> None:
@@ -524,18 +546,23 @@ def test_missing_manifest_is_reported_rather_than_assumed(tmp_path) -> None:
         load_scenarios(tmp_path)
 
 
-def test_engine_stays_silent_on_the_control_region(cleaned_dataset, generated_dataset_dir) -> None:
+def test_engine_stays_silent_on_every_control(cleaned_dataset, generated_dataset_dir) -> None:
     """A detector that fires every week is not detecting anything.
 
-    The control window has no scenario under way anywhere, so a strict floor
-    must return nothing at all.
+    Each control window has no scenario under way, so a strict floor must return
+    nothing at all -- on both of them, not on whichever one happens to come
+    first in the manifest.
     """
     scenarios = load_scenarios(generated_dataset_dir)
-    control = next(s for s in scenarios if s["expected_pattern"] is None)
-    result = evaluate_scenario(cleaned_dataset.tables, control, scenarios, confidence_floor="high")
+    controls = [s for s in scenarios if s["expected_pattern"] is None]
+    assert controls
 
-    assert result.outcome == "correct_silence"
-    assert result.signals_returned == 0
+    for control in controls:
+        result = evaluate_scenario(
+            cleaned_dataset.tables, control, scenarios, confidence_floor="high"
+        )
+        assert result.outcome == "correct_silence", control["name"]
+        assert result.signals_returned == 0, control["name"]
 
 
 def test_planted_scenarios_are_classified_correctly_at_medium_confidence(

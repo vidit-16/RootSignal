@@ -18,7 +18,7 @@ baskets, so summing `sales_order_count` across the mart legitimately exceeds the
 distinct order count, while no single cell may exceed it. Daily distinct counts
 do add up, because an order belongs to one date.
 
-The generated dataset also carries four labelled scenarios and their evaluation
+The generated dataset also carries five labelled scenarios and their evaluation
 windows in `dataset_manifest.json`, so the signal engine can be scored against
 what was actually planted rather than against a restatement of it.
 
