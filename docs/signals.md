@@ -256,6 +256,11 @@ python scripts/evaluate_signals.py
 | **high** | 2 of 3 | 0.67 | **0** | **2 of 2** |
 | **medium** | **3 of 3** | **1.00** | 12 | 0 of 2 |
 
+The false-alarm column counts every signal that matched nothing planted, wherever
+it was raised — at a medium floor that is 9 on the two control windows and 3
+alongside findings that were themselves correct. It is not a count of control
+signals alone.
+
 This is a precision/recall trade-off, measured rather than asserted. At a high
 floor the engine raises nothing it cannot support and stays completely silent on
 both control windows, at the cost of missing the mix shift — the subtlest of the

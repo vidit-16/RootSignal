@@ -77,7 +77,7 @@ Reproduced by the committed test suite and evaluation scripts.
 
 | | Result |
 | --- | --- |
-| **Scenario detection** | 5 situations planted (supply constraint, demand decline, mix shift, and two controls where nothing happens). **3 of 3 correctly classified** at a medium confidence floor; **2 of 3 with zero false alarms and silence on both controls** at a high floor |
+| **Scenario detection** | 5 situations planted (supply constraint, demand decline, mix shift, and two controls where nothing happens). **3 of 3 correctly classified** at a medium confidence floor, at the cost of **12 false-alarm signals** — 9 of them on the two controls, 3 raised alongside correct findings; **2 of 3 with zero false alarms and silence on both controls** at a high floor |
 | **Real public data** | UCI Online Retail II, **1,044,420 invoice lines over 739 days**. 3 defects found in the published data, 2,590 unsellable lines quarantined, then **zero validation errors** |
 | **Forecast accuracy** | `seasonal_mean_7` beats naive by **+28.9%** WAPE on daily net sales and **+19.1%** on units; `ses` leads orders at **+22.2%**. On the real dataset, **+38.8%** across 49 folds — the same model wins on both |
 | **SQL / Python parity** | The commercial mart is implemented twice and a test asserts the two agree across **3,663 rows and 11 metric columns**. The SQL watchlist and the Python engine — sharing no code — independently flag the same two disrupted segments |
@@ -85,6 +85,22 @@ Reproduced by the committed test suite and evaluation scripts.
 | **Plan vs actual** | Attainment spans **87.4% to 125.6%** across 64 region/category/channel segments, evenly split 32 above plan and 32 below. KAM quota attainment runs **89.8% to 106.0%** across four managers, three ahead and one behind |
 | **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
 | **Tests** | **308 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+
+**On that false-alarm figure.** The 12 counts every signal that matched nothing
+planted, wherever it was raised: 9 on the two control windows and 3 alongside
+findings that were themselves correct.
+
+The two controls disagree, and that is the more useful number. One raises three
+false alarms at a medium floor and the other six, so the rate varies two-fold
+between windows that both have nothing planted in them.
+
+The evaluation used to carry a single control and reported half that total, which
+read better and showed less. Two controls is enough to establish that the spread
+is real and not enough to size it, and there is no principled stopping point short
+of many — so the honest description of that number is a measurement with a known
+width rather than a result. It is quoted here at its widest because a figure that
+only appears in its flattering form is the thing this project exists to argue
+against.
 
 ## Quick start
 
@@ -183,7 +199,7 @@ works fully without. Power BI is deliberately out of scope.
 | Driver decomposition | Exact attribution to segments, with rate and mix separated for ratios | [decomposition.md](docs/decomposition.md) |
 | Impact estimation | Fulfilment shortfall valued at realised prices, every assumption stated | [signals.md](docs/signals.md) |
 | RootSignal engine | Evidence, pattern, impact, confidence and recommended investigation, ranked | [signals.md](docs/signals.md) |
-| Scenario evaluation | Measures whether the engine tells four planted situations apart | [signals.md](docs/signals.md) |
+| Scenario evaluation | Measures whether the engine tells three planted situations apart and stays silent on two controls | [signals.md](docs/signals.md) |
 | SQL layer | Staging views, commercial mart and seven business queries, all executed by tests | [sql.md](docs/sql.md) |
 | Excel reporting | Six operational workbooks, each opening with what its figures mean | [reporting.md](docs/reporting.md) |
 | Dashboard | Five Streamlit pages over a Streamlit-free, tested data layer | [dashboard.md](docs/dashboard.md) |
@@ -229,7 +245,7 @@ Given a movement in a business metric, it attributes the change to segments
 exactly, separates genuine performance change from shifts in demand mix,
 estimates the revenue involved with assumptions stated, and reports confidence
 against six named criteria rather than a tuned score. It is validated against
-four planted scenarios — classifying three of three correctly at a medium
+five planted scenarios — classifying three of three correctly at a medium
 confidence floor, with zero false alarms at a high one — and runs unchanged on
 a million real invoice lines from a public dataset, where it beats a naive
 forecast baseline by 38.8% across 49 backtest folds. Python, pandas, SQL,
