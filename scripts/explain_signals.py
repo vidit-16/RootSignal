@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import argparse
 
+from rootsignal.console import use_utf8_output
 from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.explanation import explain, is_available, write_briefing, write_summary
 from rootsignal.signals import detect_signals
 
 
 def main() -> None:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Explain RootSignal findings in plain English.")
     parser.add_argument("--input-dir", default="data/raw/generated")
     parser.add_argument("--metric", default="fill_rate")

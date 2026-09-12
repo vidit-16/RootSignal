@@ -11,11 +11,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from rootsignal.console import use_utf8_output
 from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.sql import available_queries, build_database, run_query_file
 
 
 def main() -> None:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Run a RootSignal analytical SQL query.")
     parser.add_argument("query", nargs="?", help="Query name; omit to list what is available.")
     parser.add_argument("--input-dir", default="data/raw/generated", help="Directory of raw CSV tables.")

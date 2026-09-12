@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from rootsignal.console import use_utf8_output
 from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.signals import evaluate_scenarios, load_scenarios, summarise_evaluation
 
@@ -32,6 +33,7 @@ DETAIL_COLUMNS = [
 
 
 def main() -> None:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Evaluate RootSignal scenario detection.")
     parser.add_argument("--input-dir", default="data/raw/generated", help="Directory of raw CSV tables.")
     parser.add_argument("--floors", default="high,medium", help="Comma-separated confidence floors.")

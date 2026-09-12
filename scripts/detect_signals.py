@@ -15,11 +15,13 @@ import argparse
 import json
 from pathlib import Path
 
+from rootsignal.console import use_utf8_output
 from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.signals import detect_signals, explain_signal, signals_to_frame
 
 
 def main() -> None:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Detect RootSignals in a business dataset.")
     parser.add_argument("--input-dir", default="data/raw/generated", help="Directory of raw CSV tables.")
     parser.add_argument("--metric", default="fill_rate", help="Metric whose movement to investigate.")

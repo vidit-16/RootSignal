@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from rootsignal.console import use_utf8_output
 from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.forecasting import (
     build_daily_series,
@@ -54,6 +55,7 @@ def evaluate_metric(
 
 
 def main() -> None:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Backtest RootSignal forecasting models.")
     parser.add_argument("--input-dir", default="data/raw/generated", help="Directory of raw CSV tables.")
     parser.add_argument("--horizon", type=int, default=7, help="Forecast horizon in days.")

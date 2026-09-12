@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from rootsignal.console import use_utf8_output
 from rootsignal.adapters.online_retail import adapt, returns_by_period, returns_frame
 from rootsignal.analysis import calculate_trend, summarise_by_period
 from rootsignal.cleaning import clean_dataset
@@ -40,6 +41,7 @@ def heading(title: str) -> None:
 
 
 def main() -> None:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Run RootSignal on a real public dataset.")
     parser.add_argument("--cache-dir", default="data/raw/external/online_retail")
     parser.add_argument("--sheets", type=int, default=None, help="Limit sheets read, for speed.")

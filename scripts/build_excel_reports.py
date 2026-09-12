@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import argparse
 
+from rootsignal.console import use_utf8_output
 from rootsignal.dataset import load_tables_for_analysis
 from rootsignal.reporting import available_reports, build_all_reports
 
 
 def main() -> None:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Build RootSignal Excel reports.")
     parser.add_argument("--input-dir", default="data/raw/generated", help="Directory of raw CSV tables.")
     parser.add_argument("--output-dir", default="reports", help="Where to write the workbooks.")
