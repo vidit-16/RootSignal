@@ -7,6 +7,8 @@ name = "rootsignal"
 version = "0.1.0"
 description = "Evidence-backed analytics for sales, supply, and business performance."
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "numpy>=1.26,<3",
     "pandas>=2.1,<3",
