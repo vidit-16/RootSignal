@@ -336,3 +336,41 @@ def test_a_truncated_final_period_is_dropped_by_default() -> None:
 
     assert not kept.empty
     assert dropped.empty, "three days of December is not a December"
+
+
+def test_capabilities_describe_themselves_for_a_reader() -> None:
+    """describe() is what run_external_dataset prints before any analysis.
+
+    It was the largest untested block in the adapters, and it is the first thing
+    a reader of that script sees -- the statement of what this dataset can and
+    cannot be asked, before a single number is shown.
+    """
+    capabilities = DatasetCapabilities(
+        name="Online Retail II",
+        available_facts=("fact_sales",),
+        notes=("Returns are separated from sales rather than netted.",),
+    )
+    text = capabilities.describe()
+
+    assert "Online Retail II" in text
+    assert "fact_sales" in text, "names what it has"
+    assert "fact_orders" in text, "names what it lacks"
+    assert "Returns are separated" in text, "carries the notes a reader needs"
+
+    # Every unsupported analysis is listed with the fact that blocks it, so the
+    # gap is legible rather than a bare absence.
+    for analysis in capabilities.unsupported_analyses:
+        assert capabilities.why_unsupported(analysis) in text
+
+
+def test_a_dataset_with_everything_reports_no_gaps() -> None:
+    """The other side of describe(): nothing missing, nothing to warn about."""
+    capabilities = DatasetCapabilities(
+        name="Complete", available_facts=tuple(sorted(set().union(*ANALYSIS_REQUIREMENTS.values())))
+    )
+    text = capabilities.describe()
+
+    assert capabilities.unsupported_analyses == ()
+    assert "Cannot answer" not in text
+    assert "Read before using" not in text, "no notes, so no notes section"
+    assert capabilities.why_unsupported(next(iter(ANALYSIS_REQUIREMENTS))) == ""

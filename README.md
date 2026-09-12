@@ -84,7 +84,7 @@ Reproduced by the committed test suite and evaluation scripts.
 | **Data quality** | **8 errors** detected across 10 raw tables; cleaning imputes 3 fields, drops 2 exact duplicates, quarantines 1 impossible line; **zero errors** after |
 | **Plan vs actual** | Attainment spans **87.4% to 125.6%** across 64 region/category/channel segments, evenly split 32 above plan and 32 below. KAM quota attainment runs **89.8% to 106.0%** across four managers, three ahead and one behind |
 | **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
-| **Tests** | **295 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+| **Tests** | **307 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
 
 ## Quick start
 
@@ -233,7 +233,7 @@ four planted scenarios — classifying three of three correctly at a medium
 confidence floor, with zero false alarms at a high one — and runs unchanged on
 a million real invoice lines from a public dataset, where it beats a naive
 forecast baseline by 38.8% across 49 backtest folds. Python, pandas, SQL,
-Streamlit; 295 tests, including one asserting that no output ever claims
+Streamlit; 307 tests, including one asserting that no output ever claims
 causation.
 
 </details>

@@ -518,3 +518,20 @@ def test_a_small_count_does_not_vouch_for_a_percentage() -> None:
     """
     package = {"confidence": {"criteria_met": 5, "criteria_total": 6}}
     assert not verify_numbers("a rise of 500%", package).verified
+
+
+def test_a_bare_number_is_not_read_as_a_percentage_of_a_ratio() -> None:
+    """The conversion in known_values stops at one, and has to.
+
+    A rate of 0.874 is written 87.4, sometimes with the sign and sometimes with
+    the word, so the accepted set carries the converted form. A ratio of 1.5 is
+    a different matter: without a percent sign to say otherwise, a bare 150 is a
+    number in its own right and nothing in the evidence stands behind it.
+
+    A percentage written with its sign is handled elsewhere, by reading the
+    token back to its fraction -- which is what lets 1550% through without
+    letting this through.
+    """
+    assert verify_numbers("a rate of 87.4", {"rate": 0.874}).verified
+    assert not verify_numbers("a ratio of 150", {"ratio": 1.5}).verified
+    assert verify_numbers("a ratio of 150%", {"ratio": 1.5}).verified
