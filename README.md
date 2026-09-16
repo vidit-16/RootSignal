@@ -130,7 +130,7 @@ python scripts/evaluate_signals.py
 ```
 
 ```bash
-streamlit run app/streamlit_app.py
+streamlit run app/Overview.py
 ```
 
 ```bash

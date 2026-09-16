@@ -4,7 +4,7 @@
 
 ```bash
 pip install -e ".[dashboard]"
-streamlit run app/streamlit_app.py
+streamlit run app/Overview.py
 ```
 
 | Page | Question |
