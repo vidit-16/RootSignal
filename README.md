@@ -84,7 +84,8 @@ Reproduced by the committed test suite and evaluation scripts.
 | **Data quality** | **8 errors** detected across 10 raw tables; cleaning imputes 3 fields, drops 2 exact duplicates, quarantines 1 impossible line; **zero errors** after |
 | **Plan vs actual** | Attainment spans **87.4% to 125.6%** across 64 region/category/channel segments, evenly split 32 above plan and 32 below. KAM quota attainment runs **89.8% to 106.0%** across four managers, three ahead and one behind |
 | **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
-| **Tests** | **308 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+| **Tests** | **316 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+| **Mutation testing** | `scripts/mutation_test.py` applies 37 operator and constant mutations to the KPI layer; the suite kills **34 (91.9%)**. The 3 survivors are equivalent mutants (`> 0` vs `>= 0` on a count that is never zero, or on a ratio where 0/0 is already NaN) |
 
 **On that false-alarm figure.** The 12 counts every signal that matched nothing
 planted, wherever it was raised: 9 on the two control windows and 3 alongside
@@ -140,6 +141,7 @@ python scripts/evaluate_forecasts.py     # forecast accuracy, five models
 python scripts/build_excel_reports.py    # six operational workbooks
 python scripts/run_sql_query.py          # the seven analytical SQL queries
 pytest                                   # the full suite
+python scripts/mutation_test.py          # mutation score for the KPI layer
 ```
 
 </details>
