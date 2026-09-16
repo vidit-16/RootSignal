@@ -24,3 +24,19 @@ reports/
 
 # Downloaded public datasets (fetched by the adapter on demand)
 data/raw/external/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Coverage / mutation testing
+.coverage
+coverage.xml
+htmlcov/
+mutants/
+
+# IDE tooling
+.vscode/
+.idea/
+.DS_Store
