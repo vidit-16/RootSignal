@@ -12,6 +12,15 @@ It is built to be *checkable*. Every headline number below is reproduced by a
 committed script or test, and the system declines to answer questions its data
 cannot support.
 
+<p align="center">
+  <img src="docs/screenshots/rootsignal_signals.png" alt="What to look into: movements ranked by estimated impact" width="100%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/rootsignal_home.png" alt="Weekly headline metrics and data-quality actions" width="49%">
+  <img src="docs/screenshots/rootsignal_forecasting.png" alt="Forecast methods compared by error rate" width="49%">
+</p>
+<p align="center"><em>Movements ranked by estimated impact, each with a confidence rating and the evidence behind it (top). Weekly headline metrics with data-quality actions, and forecasting methods compared against a naive baseline (bottom). Generated sample data.</em></p>
+
 ---
 
 ## What it actually produces
