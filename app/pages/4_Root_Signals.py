@@ -137,9 +137,6 @@ for position, signal in enumerate(signals):
             f"**The other possibility:** {readable_text(signal.pattern.alternative_hypothesis)} "
             f"{readable_text(signal.pattern.alternative_note)}"
         )
-        st.info(
-            f"**What to check next:** {readable_text(signal.pattern.recommended_investigation)}"
-        )
 
         tabs = st.tabs(["The numbers behind it", "The checks", "How the estimate was made"])
         with tabs[0]:
@@ -151,9 +148,9 @@ for position, signal in enumerate(signals):
             criteria = views["criteria"]
             rows = criteria[criteria["segment"] == signal.segment]
             for _, row in rows.iterrows():
-                mark = "✅" if row["met"] else "⬜"
+                status = "Met" if row["met"] else "Not met"
                 st.markdown(
-                    f"{mark} **{describe_criterion(row['criterion'])}** — {row['detail']}"
+                    f"**{status}:** {describe_criterion(row['criterion'])}. {row['detail']}"
                 )
             caveat(
                 "How well supported is a count of these six checks. It is not a probability, "

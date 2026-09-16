@@ -87,8 +87,11 @@ def get_periods(input_dir: str, period: str) -> list:
     return available_periods(get_data(input_dir)["tables"], period=period)
 
 
+FAVICON = str(APP_DIR / "favicon.png")
+
+
 def configure(title: str) -> None:
-    st.set_page_config(page_title=f"RootSignal - {title}", page_icon="🌱", layout="wide")
+    st.set_page_config(page_title=f"RootSignal | {title}", page_icon=FAVICON, layout="wide")
 
 
 def sidebar(show_period: bool = True) -> tuple[str, str]:
