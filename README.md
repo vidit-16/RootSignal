@@ -1,6 +1,6 @@
 # RootSignal
 
-**A metric moved. RootSignal finds where, prices what it cost, says how confident it is — and states what it refuses to conclude.**
+**A sales metric moved. RootSignal names the segment behind it, puts a number on what it cost, and rates its own confidence.**
 
 Root-cause analytics for sales and supply operations. Given a movement in a
 business metric, it identifies the segment responsible, separates a genuine
