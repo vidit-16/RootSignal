@@ -24,6 +24,13 @@ from ..forecasting import (
 )
 
 
+# The backtest behind the README's forecast figure: a week ahead, eight weeks of
+# history before the first fold, a new fold every fortnight. On Online Retail II
+# that is 49 folds. scripts/run_external_dataset.py uses the same settings, so
+# the report table and the published number cannot drift apart.
+BACKTEST = {"horizon": 7, "initial_train": 56, "step": 14}
+
+
 def analysis_tables(tables: dict[str, pd.DataFrame], returns: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Every report table, keyed by the name it is published under."""
     sales = tables["fact_sales"]
@@ -42,7 +49,7 @@ def analysis_tables(tables: dict[str, pd.DataFrame], returns: pd.DataFrame) -> d
     daily = build_daily_series(sales, metrics=["net_sales", "units"])
     accuracy = compare_against_baseline(
         summarise_backtest(
-            rolling_origin_evaluate(extract_metric(daily, "net_sales"), horizon=7, initial_train=56, step=14)
+            rolling_origin_evaluate(extract_metric(daily, "net_sales"), **BACKTEST)
         )
     )
 

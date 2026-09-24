@@ -62,6 +62,9 @@ CAPABILITIES = DatasetCapabilities(
         "Roughly a fifth of lines have no customer identifier. Those rows are "
         "kept with an explicit UNKNOWN customer rather than dropped, because "
         "discarding a fifth of revenue would misstate the business.",
+        "Stock codes are upper-cased and trimmed. 172 codes appear in two forms, "
+        "such as 15056BL and 15056bl, or 47503J with a trailing space, for the "
+        "same product; kept apart, one product's sales would split across two.",
     ),
 )
 
@@ -137,7 +140,10 @@ def adapt(
 
     frame["date"] = pd.to_datetime(frame["timestamp"], errors="coerce").dt.date
     frame["order_id"] = frame["order_id"].astype(str)
-    frame["sku_id"] = frame["sku_id"].astype(str)
+    # The same product appears as 15056BL and 15056bl, and as 47503J with and
+    # without a trailing space. The code identifies the product; its case and
+    # padding do not.
+    frame["sku_id"] = frame["sku_id"].astype(str).str.strip().str.upper()
     frame["category"] = _derive_category(frame["sku_name"])
 
     # A fifth of lines have no customer. Dropping them would remove a fifth of

@@ -8,6 +8,7 @@ locally, `docker compose up -d warehouse` provides one.
 from __future__ import annotations
 
 import os
+import re
 import uuid
 
 import numpy as np
@@ -16,8 +17,8 @@ import pytest
 
 from rootsignal.modeling import build_commercial_mart
 from rootsignal.sql import available_queries, build_database, query, run_query_file
-from rootsignal.sql.database import ANALYTICS_DIR, MARTS_DIR, SCHEMA_PATH, STAGING_DIR
-from rootsignal.sql.dialect import to_postgres
+from rootsignal.sql.database import ANALYTICS_DIR, LOAD_ORDER, MARTS_DIR, SCHEMA_PATH, STAGING_DIR
+from rootsignal.sql.dialect import schema_columns, to_postgres, to_redshift
 from rootsignal.sql.warehouse import (
     URL_VARIABLE,
     build_warehouse,
@@ -66,6 +67,86 @@ def test_a_construct_mentioned_only_in_a_comment_is_not_refused() -> None:
 def test_every_sql_file_in_the_repository_translates(path) -> None:
     """A new query using an unhandled construct fails here, not on the server."""
     to_postgres(path.read_text(encoding="utf-8"))
+
+
+def test_redshift_translation_removes_checks_and_nothing_else() -> None:
+    sql = (
+        "CREATE TABLE t (\n"
+        "    a TEXT NOT NULL CHECK (a IN ('x', 'y')),\n"
+        "    b REAL NOT NULL CHECK (b >= 0 AND (b <= 1)),\n"
+        "    c INTEGER\n"
+        ");"
+    )
+    assert to_redshift(sql) == (
+        "CREATE TABLE t (\n"
+        "    a VARCHAR(1024) NOT NULL,\n"
+        "    b DOUBLE PRECISION NOT NULL,\n"
+        "    c INTEGER\n"
+        ");"
+    )
+
+
+def test_schema_columns_reads_names_and_types_in_order() -> None:
+    declared = schema_columns(SCHEMA_PATH.read_text(encoding="utf-8"))
+    assert set(declared) == set(LOAD_ORDER)
+    assert declared["dim_date"] == [
+        ("date", "DATE"), ("week", "INTEGER"), ("month", "INTEGER"), ("quarter", "TEXT"), ("year", "INTEGER")
+    ]
+
+
+def _sql_code(path) -> str:
+    return re.sub(r"--[^\n]*", "", path.read_text(encoding="utf-8"))
+
+
+ALL_SQL = [*sorted(STAGING_DIR.glob("*.sql")), *sorted(MARTS_DIR.glob("*.sql")), *sorted(ANALYTICS_DIR.glob("*.sql"))]
+
+
+@pytest.mark.parametrize("path", ALL_SQL, ids=lambda path: path.stem)
+def test_every_average_is_of_a_real_number(path) -> None:
+    """Redshift's AVG of an integer column is an integer.
+
+    SQLite and PostgreSQL return a fraction, so the warehouse tests cannot see
+    the difference; a stockout rate over 0/1 flags would read 0 on Redshift
+    alone. Every AVG therefore averages a cast, or a column declared REAL.
+    """
+    real_columns = {
+        column for columns in schema_columns(SCHEMA_PATH.read_text(encoding="utf-8")).values()
+        for column, kind in columns if kind == "REAL"
+    }
+    code = _sql_code(path)
+    for match in re.finditer(r"\bAVG\(\s*", code, re.IGNORECASE):
+        rest = code[match.end():]
+        if rest.upper().startswith("CAST("):
+            continue
+        column = re.match(r"([\w.]+)\s*\)", rest).group(1).split(".")[-1]
+        assert column in real_columns, f"{path.stem}: AVG({column}) averages an integer column"
+
+
+# The columns that identify one output row of each query. Sorting on anything
+# less leaves tied rows in whatever order the engine produces, and SQLite and
+# PostgreSQL produce different ones.
+QUERY_GRAIN = {
+    "daily_sales_tracker": ["date"],
+    "fill_rate_by_segment": ["week_start", "region_code", "category"],
+    "kam_scorecard": ["kam_id"],
+    "primary_secondary_mix": ["month", "region_code"],
+    "supply_watchlist": ["week_start", "region_code", "category"],
+    "target_variance": ["region_code", "category", "channel"],
+    "weekly_movers": ["week_start", "region_code", "category"],
+}
+
+
+def test_every_query_has_a_declared_grain() -> None:
+    assert set(QUERY_GRAIN) == set(available_queries())
+
+
+@pytest.mark.parametrize("name", sorted(QUERY_GRAIN))
+def test_every_query_sorts_on_its_full_grain(name) -> None:
+    code = _sql_code(ANALYTICS_DIR / f"{name}.sql")
+    order_by = code[code.upper().rindex("ORDER BY"):]
+    sorted_on = {term.strip().split()[0].split(".")[-1] for term in order_by[len("ORDER BY"):].rstrip("; \n").split(",")}
+    missing = [column for column in QUERY_GRAIN[name] if column not in sorted_on]
+    assert not missing, f"{name} does not sort on {missing}"
 
 
 # --------------------------------------------------------------------------
@@ -149,6 +230,16 @@ def test_every_analytical_query_matches_sqlite_row_for_row(engines, name) -> Non
     """Same rows in the same order: the queries sort on a full key."""
     _, sqlite, warehouse = engines
     _assert_same(run_query_file(sqlite, name), run_warehouse_query_file(warehouse, name))
+
+
+@needs_warehouse
+def test_a_column_of_nulls_comes_back_as_numbers_not_objects(engines) -> None:
+    """psycopg returns None for NULL, which pandas would hold as an object column."""
+    _, _, warehouse = engines
+    frame = query_warehouse(
+        warehouse, "SELECT CAST(NULL AS DOUBLE PRECISION) AS x UNION ALL SELECT CAST(NULL AS DOUBLE PRECISION)"
+    )
+    assert frame["x"].dtype == float and frame["x"].isna().all()
 
 
 @needs_warehouse

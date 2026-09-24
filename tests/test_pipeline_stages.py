@@ -78,6 +78,96 @@ def test_report_tables_are_flattened_to_plain_columns() -> None:
     assert flat["count"].tolist() == [3, 4] and flat["complete"].tolist() == [True, False]
 
 
+def test_the_spark_job_is_where_the_pipeline_looks_for_it() -> None:
+    from rootsignal.pipeline.stages import JOB_PATH
+
+    assert JOB_PATH.is_file() and JOB_PATH.name == "conform_online_retail.py"
+
+
+def test_a_failed_spark_run_stops_the_pipeline_with_its_error(monkeypatch, tmp_path) -> None:
+    """The job's own last words are what someone debugging it needs."""
+    import subprocess
+
+    from rootsignal.pipeline import conform_locally, stages
+
+    failed = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="x" * 6000 + "Py4JJavaError: disk full")
+    monkeypatch.setattr(stages.subprocess, "run", lambda *args, **kwargs: failed)
+
+    with pytest.raises(RuntimeError, match="disk full") as raised:
+        conform_locally(Lake(str(tmp_path)))
+    assert len(str(raised.value)) < 4100, "the whole log is not pasted into the error"
+
+
+def test_a_run_that_exits_cleanly_is_not_reported_as_failed(monkeypatch, tmp_path) -> None:
+    import subprocess
+
+    from rootsignal.pipeline import conform_locally, stages
+
+    monkeypatch.setattr(
+        stages.subprocess, "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="WARN only"),
+    )
+    monkeypatch.setattr(stages, "read_summary", lambda lake: {"source_rows": 3})
+    assert conform_locally(Lake(str(tmp_path))) == {"source_rows": 3}
+
+
+def write_curated_zone(root, cleaned_tables) -> None:
+    """A curated zone laid out as the Spark job writes it, without running Spark."""
+    import json
+
+    from rootsignal.pipeline import CURATED
+    from rootsignal.pipeline.stages import CURATED_TABLES
+
+    for name in CURATED_TABLES:
+        folder = root / CURATED / name
+        folder.mkdir(parents=True)
+        cleaned_tables[name].to_parquet(folder / "part-00000.parquet", index=False)
+    returns = pd.DataFrame(
+        {"order_id": ["C1"], "sku_id": ["A"], "region_code": ["France"], "customer_id": ["UNKNOWN"],
+         "date": [dt.date(2024, 1, 3)], "units": [-2], "returned_units": [2]}
+    )
+    (root / CURATED / "returns").mkdir(parents=True)
+    returns.to_parquet(root / CURATED / "returns" / "part-00000.parquet", index=False)
+    (root / CURATED / "_summary").mkdir(parents=True)
+    summary = {"source_rows": 1234, "returned_lines": 56, "consolidated_lines": 7, "tables": {}}
+    (root / CURATED / "_summary" / "part-00000.txt").write_text(json.dumps(summary), encoding="utf-8")
+
+
+def test_the_curated_zone_reads_back_as_the_adapter_would_return_it(cleaned_dataset, tmp_path) -> None:
+    from rootsignal.pipeline import read_curated
+    from rootsignal.pipeline.stages import EMPTY_FACTS
+
+    write_curated_zone(tmp_path, cleaned_dataset.tables)
+    dataset, returns = read_curated(Lake(str(tmp_path)))
+
+    assert dataset.source_rows == 1234
+    sales = dataset.tables["fact_sales"]
+    assert len(sales) == len(cleaned_dataset.tables["fact_sales"])
+    assert isinstance(sales["date"].iloc[0], dt.date) and not isinstance(sales["date"].iloc[0], dt.datetime)
+    assert isinstance(returns["date"].iloc[0], dt.date)
+    for name in EMPTY_FACTS:
+        assert name in dataset.tables and dataset.tables[name].empty
+    notes = " ".join(dataset.capabilities.notes)
+    assert "56 of 1,234 lines are returns" in notes
+    assert "7 invoice lines repeat a product" in notes
+    assert "Conformed in Spark" in notes
+
+
+def test_the_report_backtest_is_the_one_behind_the_published_figure() -> None:
+    """The README's 38.8% over 49 folds comes from these settings.
+
+    scripts/run_external_dataset.py produces that figure and the report table
+    must match it, so both read one constant rather than two copies.
+    """
+    from pathlib import Path
+
+    from rootsignal.pipeline.publish import BACKTEST
+
+    assert BACKTEST == {"horizon": 7, "initial_train": 56, "step": 14}
+    script = (Path(__file__).resolve().parents[1] / "scripts" / "run_external_dataset.py").read_text(encoding="utf-8")
+    assert "rolling_origin_evaluate(series, **BACKTEST)" in script
+
+
 def test_nothing_is_loaded_while_validation_still_fails(monkeypatch, cleaned_dataset) -> None:
     import rootsignal.sql.warehouse as warehouse
     from rootsignal.validation import DatasetValidator

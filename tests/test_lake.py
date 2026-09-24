@@ -29,6 +29,13 @@ def test_an_s3_lake_splits_bucket_and_prefix() -> None:
     assert Lake("s3://rootsignal-lake").uri(RAW) == "s3://rootsignal-lake/raw/online_retail"
 
 
+def test_an_s3_prefix_can_be_several_folders_deep() -> None:
+    lake = Lake("s3://rootsignal-lake/teams/analytics/rootsignal")
+    assert lake.bucket == "rootsignal-lake"
+    assert lake.prefix == "teams/analytics/rootsignal"
+    assert lake.key(RAW, "invoices.csv") == "teams/analytics/rootsignal/raw/online_retail/invoices.csv"
+
+
 @pytest.fixture
 def s3(monkeypatch):
     moto = pytest.importorskip("moto")

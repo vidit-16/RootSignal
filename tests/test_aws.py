@@ -429,3 +429,77 @@ def test_billable_resources_lists_what_exists_and_nothing_else(clients) -> None:
     )
 
     assert aws.billable_resources() == [f"Redshift Serverless workgroup {aws.WORKGROUP} (AVAILABLE)"]
+
+
+# --------------------------------------------------------------------------
+# The ceilings, and the edges of the arithmetic
+# --------------------------------------------------------------------------
+
+
+def test_the_spending_ceilings_are_the_ones_the_module_states() -> None:
+    """Glue at two workers, Redshift at 8 RPU capped at 4 RPU-hours a day."""
+    import inspect
+
+    assert inspect.signature(aws.run_glue).parameters["workers"].default == 2
+    redshift = inspect.signature(aws.ensure_redshift).parameters
+    assert redshift["base_capacity"].default == 8
+    assert redshift["daily_rpu_hours"].default == 4
+    assert inspect.signature(aws.execute).parameters["timeout"].default == 900
+
+
+def test_an_hour_on_two_glue_workers_is_two_dpu_hours(clients) -> None:
+    clients["glue"] = FakeClient(
+        get_job={"Job": {}},
+        start_job_run={"JobRunId": "jr"},
+        get_job_run={"JobRun": {"JobRunState": "SUCCEEDED", "ExecutionTime": 3600}},
+    )
+    assert aws.run_glue(LAKE, "arn:role", workers=2).usage == "2.000 DPU-hours"
+
+
+def test_a_run_that_reports_no_time_is_billed_the_minimum(clients) -> None:
+    clients["glue"] = FakeClient(
+        get_job={"Job": {}}, start_job_run={"JobRunId": "jr"}, get_job_run={"JobRun": {"JobRunState": "FAILED"}}
+    )
+    run = aws.run_glue(LAKE, "arn:role", workers=2)
+    assert run.seconds == 0.0
+    assert run.usage == f"{60 / 3600 * 2:.3f} DPU-hours"
+
+
+def test_emr_usage_missing_from_the_response_is_reported_as_zero(clients) -> None:
+    clients["emr-serverless"] = FakeClient(
+        list_applications={"applications": [{"name": aws.EMR_APP, "state": "STARTED", "id": "app"}]},
+        start_job_run={"jobRunId": "run"},
+        get_job_run={"jobRun": {"state": "FAILED", "stateDetails": "quota"}},
+    )
+    run = aws.run_emr(LAKE, "arn:emr", "s3://x/out")
+    assert (run.seconds, run.usage, run.error) == (0.0, "0.000 vCPU-hours, 0.000 GB-hours", "quota")
+
+
+def test_a_statement_finishing_exactly_at_the_timeout_is_not_cancelled(clients, monkeypatch) -> None:
+    """The limit is exceeded only after the timeout, not on it.
+
+    The clock starts at 100 rather than 0, so the elapsed time is measured, not
+    the clock's reading.
+    """
+    data = clients["redshift-data"] = FakeClient(
+        execute_statement={"Id": "s"},
+        describe_statement=sequence({"Status": "STARTED"}, {"Status": "FINISHED"}),
+    )
+    clock = iter([100.0, 110.0])
+    monkeypatch.setattr(aws.time, "time", lambda: next(clock))
+    assert aws.execute(["SELECT 1"], timeout=10) == ["s"]
+    assert not data.called("cancel_statement")
+
+
+def test_an_analytical_query_runs_translated_inside_its_schema(clients) -> None:
+    data = clients["redshift-data"] = FakeClient(
+        batch_execute_statement={"Id": "b"},
+        describe_statement={"Status": "FINISHED", "SubStatements": [{"Id": "b:1"}, {"Id": "b:2"}]},
+        get_statement_result={"ColumnMetadata": [{"name": "week_start"}], "Records": [[{"stringValue": "2011-11-28"}]]},
+    )
+    frame = aws.query_redshift("sample", "weekly_movers")
+
+    set_path, sql = data.called("batch_execute_statement")[0]["Sqls"]
+    assert set_path == "SET search_path TO sample"
+    assert "DATE_TRUNC('week'" in sql and "weekday 0" not in sql
+    assert frame["week_start"].tolist() == ["2011-11-28"]

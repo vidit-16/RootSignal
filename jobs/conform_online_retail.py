@@ -86,7 +86,10 @@ def read_raw(spark: SparkSession, path: str) -> DataFrame:
     return raw.select(
         F.col("_row"),
         F.col("Invoice").alias("order_id"),
-        F.col("StockCode").alias("sku_id"),
+        # The same product appears as 15056BL and 15056bl, and as 47503J with
+        # and without a trailing space. Trimmed as Python's str.strip() trims,
+        # any Unicode whitespace, then upper-cased.
+        F.upper(F.regexp_replace("StockCode", r"(?U)^\s+|\s+$", "")).alias("sku_id"),
         F.col("Description").alias("sku_name"),
         F.col("Quantity").cast("long").alias("units"),
         F.to_timestamp("InvoiceDate").alias("timestamp"),
