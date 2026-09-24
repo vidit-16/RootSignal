@@ -22,13 +22,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Spark runs on the JVM. The conform job is tested in here, on Linux, which is
+# also what Glue and EMR run it on.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-17-jre-headless \
+ && rm -rf /var/lib/apt/lists/*
+
 # Dependencies are installed from pyproject.toml alone, against a placeholder
 # package, so that editing source code does not invalidate the layer holding
 # pandas, numpy and streamlit.
 COPY pyproject.toml README.md ./
 RUN mkdir -p src/rootsignal \
  && touch src/rootsignal/__init__.py \
- && pip install --no-cache-dir ".[dev,dashboard,ai]" \
+ && pip install --no-cache-dir ".[dev,dashboard,ai,pipeline]" \
  && rm -rf src
 
 COPY . .

@@ -19,7 +19,7 @@ docker run --rm rootsignal pytest
 
 ```bash
 docker run --rm -p 8501:8501 rootsignal                 # the dashboard
-docker run --rm rootsignal pytest                       # all 308 tests
+docker run --rm rootsignal pytest                       # the full suite, Spark tests included
 docker run --rm rootsignal python scripts/detect_signals.py
 ```
 

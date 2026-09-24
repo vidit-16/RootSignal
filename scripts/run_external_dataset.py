@@ -33,6 +33,7 @@ from rootsignal.forecasting import (
     rolling_origin_evaluate,
     summarise_backtest,
 )
+from rootsignal.pipeline.publish import BACKTEST
 from rootsignal.validation import DatasetValidator
 
 
@@ -148,7 +149,7 @@ def main() -> None:
     series = extract_metric(daily, "net_sales")
     print(f"{len(series)} days of history.")
     accuracy = compare_against_baseline(
-        summarise_backtest(rolling_origin_evaluate(series, horizon=7, initial_train=56, step=14))
+        summarise_backtest(rolling_origin_evaluate(series, **BACKTEST))
     )
     print(accuracy[["model", "folds", "n_observations", "mae", "wape", "wape_improvement_vs_baseline"]].to_string(index=False))
 

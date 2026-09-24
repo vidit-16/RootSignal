@@ -134,6 +134,38 @@ def test_a_product_repeated_on_one_invoice_is_consolidated() -> None:
     assert not sales.duplicated(subset=["order_id", "sku_id", "sales_type"]).any()
 
 
+def test_a_stock_code_is_one_product_whatever_its_case_or_padding() -> None:
+    """The published file writes some codes in both cases, and one with a trailing space.
+
+    172 codes appear twice this way. 163 pairs carry the same description and
+    the rest the same product worded differently, so the code is the product
+    and its case is noise. Kept apart, one product's sales split across two
+    rows, and any tool comparing text without case (Power BI does) sees
+    duplicate keys.
+    """
+    raw = raw_lines()
+    extra = pd.DataFrame(
+        {
+            "Invoice": ["536370", "536370", "536371"],
+            "StockCode": ["15056bl", "15056BL", "47503J "],
+            "Description": ["EDWARDIAN PARASOL BLACK", "EDWARDIAN PARASOL BLACK", "SET/3 FLORAL GARDEN TOOLS IN BAG"],
+            "Quantity": [2, 3, 1],
+            "InvoiceDate": pd.to_datetime(["2009-12-04 11:00", "2009-12-04 11:00", "2009-12-04 12:00"]),
+            "Price": [5.95, 5.95, 3.75],
+            "Customer ID": [17850.0, 17850.0, 17850.0],
+            "Country": ["United Kingdom"] * 3,
+        }
+    )
+    dataset = adapt(raw=pd.concat([raw, extra], ignore_index=True))
+    sales, skus = dataset.tables["fact_sales"], dataset.tables["dim_sku"]
+
+    parasol = sales[sales["sku_id"] == "15056BL"]
+    assert len(parasol) == 1 and parasol["units"].iloc[0] == 5
+    assert "15056bl" not in set(sales["sku_id"]) | set(skus["sku_id"])
+    assert "47503J" in set(skus["sku_id"]) and "47503J " not in set(skus["sku_id"])
+    assert skus["sku_id"].str.upper().is_unique
+
+
 def test_missing_customers_are_named_rather_than_dropped() -> None:
     """A fifth of real lines have no customer. Dropping them would lose a fifth of revenue."""
     dataset = adapt(raw=raw_lines())

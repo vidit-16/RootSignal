@@ -52,4 +52,4 @@ SELECT
         AS share_of_absolute_movement,
     c.days_observed
 FROM contribution AS c
-ORDER BY c.week_start, c.contribution;
+ORDER BY c.week_start, c.contribution, c.region_code, c.category;
