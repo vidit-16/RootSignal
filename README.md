@@ -93,7 +93,9 @@ Reproduced by the committed test suite and evaluation scripts.
 | **Data quality** | **8 errors** detected across 10 raw tables; cleaning imputes 3 fields, drops 2 exact duplicates, quarantines 1 impossible line; **zero errors** after |
 | **Plan vs actual** | Attainment spans **87.4% to 125.6%** across 64 region/category/channel segments, evenly split 32 above plan and 32 below. KAM quota attainment runs **89.8% to 106.0%** across four managers, three ahead and one behind |
 | **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
-| **Tests** | **316 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+| **Data pipeline** | The same 1,067,371 lines landed in S3, conformed by a **PySpark** job, cleaned, and loaded into **PostgreSQL** and **Redshift Serverless** (996,531 sales lines in each). Spark's output is **identical to the pandas adapter's in all six tables**, compared column by column on the full dataset |
+| **Warehouse parity** | Every staging view and all seven analytical queries return the **same rows on PostgreSQL and Redshift as on SQLite**. The one tolerance is `aov`, which may differ by a cent on an exact half cent because the engines round ties differently |
+| **Tests** | **363 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
 | **Mutation testing** | `scripts/mutation_test.py` applies 37 operator and constant mutations to the KPI layer; the suite kills **34 (91.9%)**. The 3 survivors are equivalent mutants (`> 0` vs `>= 0` on a count that is never zero, or on a ratio where 0/0 is already NaN) |
 
 **On that false-alarm figure.** The 12 counts every signal that matched nothing
@@ -117,6 +119,13 @@ Or don't, and check the claims instead:
 
 ```bash
 docker build -t rootsignal . && docker run --rm rootsignal pytest
+```
+
+Or run the whole pipeline on the real dataset, from download to warehouse:
+
+```bash
+docker compose up -d warehouse
+docker compose run --rm pipeline          # land, conform in Spark, load, publish
 ```
 
 Then, in rough order of what is worth seeing first:
@@ -182,9 +191,35 @@ Evidence package  —  evidence, pattern, impact, confidence criteria, alternati
 Recommended investigation
 ```
 
-**Stack:** Python, pandas, NumPy, SQL (SQLite/PostgreSQL), Streamlit, Plotly,
-pytest, GitHub Actions, and an optional OpenAI-compatible LLM that the system
-works fully without. Power BI is deliberately out of scope.
+**Stack:** Python, pandas, NumPy, PySpark, SQL (SQLite, PostgreSQL, Amazon
+Redshift), AWS S3, Streamlit, Plotly, Power BI, pytest, Docker, GitHub Actions,
+and an optional OpenAI-compatible LLM that the system works fully without.
+
+### Data pipeline
+
+```text
+UCI workbook -> S3 raw zone -> Spark conform job -> S3 curated zone (Parquet)
+     -> cleaning + validation (nothing loads while an error remains)
+     -> PostgreSQL warehouse   + S3 clean zone -> Redshift Serverless (COPY)
+     -> report tables (rate/mix split, drivers, forecast accuracy) -> Power BI
+```
+
+`jobs/conform_online_retail.py` is a PySpark version of the Online Retail
+adapter with no imports from the package, so the same file runs locally, in the
+container and on a Spark cluster. `scripts/compare_spark_to_pandas.py` checks it
+against the pandas adapter on the full dataset. Cleaning stays in pandas: it
+owns the audit trail and the quarantine, and a second implementation would mean
+a second definition of every rule.
+
+Locally the lake is a folder and the warehouse a PostgreSQL container
+(`docker compose run --rm pipeline`). `scripts/run_pipeline_aws.py` runs the same
+stages with the lake in S3 and a Redshift Serverless warehouse, capped at 8 RPU
+with a usage limit that switches it off, and a teardown step that removes
+everything that bills. Glue and EMR Serverless subcommands exist for the Spark
+step but have not been run: the account used is not yet permitted Glue jobs,
+and its EMR Serverless quota had not taken effect. The Spark job itself has only
+run locally so far. [power_bi.md](docs/power_bi.md) describes the report on the
+warehouse.
 
 ## What's built
 
@@ -204,6 +239,8 @@ works fully without. Power BI is deliberately out of scope.
 | RootSignal engine | Evidence, pattern, impact, confidence and recommended investigation, ranked | [signals.md](docs/signals.md) |
 | Scenario evaluation | Measures whether the engine tells three planted situations apart and stays silent on two controls | [signals.md](docs/signals.md) |
 | SQL layer | Staging views, commercial mart and seven business queries, all executed by tests | [sql.md](docs/sql.md) |
+| Warehouse | The same SQL on PostgreSQL and Redshift, translated from one source and held row for row to SQLite | [power_bi.md](docs/power_bi.md) |
+| Pipeline | Raw, curated and clean zones on disk or in S3, a PySpark conform job, and report tables for BI | [power_bi.md](docs/power_bi.md) |
 | Excel reporting | Six operational workbooks, each opening with what its figures mean | [reporting.md](docs/reporting.md) |
 | Dashboard | Five Streamlit pages over a Streamlit-free, tested data layer | [dashboard.md](docs/dashboard.md) |
 | Presentation | One map from schema keys to language a business reader already has | [dashboard.md](docs/dashboard.md#the-words-on-the-screen) |
@@ -251,8 +288,10 @@ against six named criteria rather than a tuned score. It is validated against
 five planted scenarios — classifying three of three correctly at a medium
 confidence floor, with zero false alarms at a high one — and runs unchanged on
 a million real invoice lines from a public dataset, where it beats a naive
-forecast baseline by 38.8% across 49 backtest folds. Python, pandas, SQL,
-Streamlit; 308 tests, including one asserting that no output ever claims
-causation.
+forecast baseline by 38.8% across 49 backtest folds. That dataset moves through
+a pipeline from S3 through a PySpark job into PostgreSQL and Redshift, with
+Spark's output checked against the pandas implementation on every row. Python,
+pandas, PySpark, SQL, AWS, Streamlit; 363 tests, including one asserting that no
+output ever claims causation.
 
 </details>
