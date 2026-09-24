@@ -59,11 +59,11 @@ The template is the reliable route. To rebuild the report from an empty file:
 - **Relationships.** `fact_sales` to `dim_date` on `date`, to `dim_customer` on
   `customer_id` and to `dim_region` on `region_code`, each many to one, single
   direction. Leave the `rpt_` tables unconnected; they are finished results.
-- **Not `dim_sku`, for now.** 172 product codes in the published data differ
-  only in case (`15056BL` and `15056bl`, both "EDWARDIAN PARASOL BLACK").
-  PostgreSQL keeps them apart, but Power BI compares text without case, finds
-  duplicates, and offers only a many-to-many relationship. The fix belongs in
-  the adapter, not the report.
+- **Products.** `fact_sales` to `dim_sku` on `sku_id` works too. Building the
+  report found 172 stock codes written in two cases or with a trailing space
+  (`15056BL` and `15056bl`); Power BI compares text without case and saw
+  duplicates. The pipeline now trims and upper-cases codes, so the relationship
+  is many to one like the others.
 - **Measures.** Power BI names ignore case, so a measure cannot be called
   `Units` next to a column called `units`:
   ```DAX

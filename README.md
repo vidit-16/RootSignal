@@ -93,10 +93,10 @@ Reproduced by the committed test suite and evaluation scripts.
 | **Data quality** | **8 errors** detected across 10 raw tables; cleaning imputes 3 fields, drops 2 exact duplicates, quarantines 1 impossible line; **zero errors** after |
 | **Plan vs actual** | Attainment spans **87.4% to 125.6%** across 64 region/category/channel segments, evenly split 32 above plan and 32 below. KAM quota attainment runs **89.8% to 106.0%** across four managers, three ahead and one behind |
 | **Reproducibility** | Identical results on **numpy 1.26 under Windows and numpy 2.5 under Linux** — same signal, same impact to the cent, same forecast improvement. The container resolves the top of the declared dependency range rather than a lockfile, which is how the numpy 2.x break was found |
-| **Data pipeline** | The same 1,067,371 lines landed in S3, conformed by a **PySpark** job, cleaned, and loaded into **PostgreSQL** and **Redshift Serverless** (996,531 sales lines in each). Spark's output is **identical to the pandas adapter's in all six tables**, compared column by column on the full dataset |
+| **Data pipeline** | The same 1,067,371 lines landed in S3, conformed by a **PySpark** job, cleaned, and loaded into **PostgreSQL** (996,528 sales lines) and **Redshift Serverless** (996,531, loaded before stock codes were made case-insensitive). Spark's output is **identical to the pandas adapter's in all six tables**, compared column by column on the full dataset |
 | **Warehouse parity** | Every staging view and all seven analytical queries return the **same rows on PostgreSQL and Redshift as on SQLite**. The one tolerance is `aov`, which may differ by a cent on an exact half cent because the engines round ties differently |
-| **Tests** | **363 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
-| **Mutation testing** | `scripts/mutation_test.py` applies 37 operator and constant mutations to the KPI layer; the suite kills **34 (91.9%)**. The 3 survivors are equivalent mutants (`> 0` vs `>= 0` on a count that is never zero, or on a ratio where 0/0 is already NaN) |
+| **Tests** | **427 automated tests**, passing on both dependency sets. One asserts that no output ever claims causation |
+| **Mutation testing** | `scripts/mutation_test.py` applies 37 operator and constant mutations to the KPI layer; the suite kills **34 (91.9%)**. The 3 survivors are equivalent mutants (`> 0` vs `>= 0` on a count that is never zero, or on a ratio where 0/0 is already NaN). On the pipeline, `scripts/mutation_test_pipeline.py` applies **28 realistic bugs** (Spark's rounding, a lost CSV option, a dropped tie-breaker, a spending cap that only logs) and the suite catches **all 28**, up from 22 before the gaps it found were tested. Operator mutants on the pipeline code: **93 of 108** caught; the 15 survivors are wait times, output file counts and print formatting |
 
 **On that false-alarm figure.** The 12 counts every signal that matched nothing
 planted, wherever it was raised: 9 on the two control windows and 3 alongside
@@ -291,7 +291,7 @@ a million real invoice lines from a public dataset, where it beats a naive
 forecast baseline by 38.8% across 49 backtest folds. That dataset moves through
 a pipeline from S3 through a PySpark job into PostgreSQL and Redshift, with
 Spark's output checked against the pandas implementation on every row. Python,
-pandas, PySpark, SQL, AWS, Streamlit; 363 tests, including one asserting that no
+pandas, PySpark, SQL, AWS, Streamlit; 427 tests, including one asserting that no
 output ever claims causation.
 
 </details>
