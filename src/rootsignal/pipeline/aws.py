@@ -417,7 +417,10 @@ def teardown() -> list[str]:
     """Remove every billable resource. The bucket and roles are kept."""
     removed = []
     glue = _client("glue")
+    # DeleteJob succeeds whether or not the job exists, so asking first is the
+    # only way to report a removal that happened rather than one that did not.
     try:
+        glue.get_job(JobName=GLUE_JOB)
         glue.delete_job(JobName=GLUE_JOB)
         removed.append(f"Glue job {GLUE_JOB}")
     except glue.exceptions.EntityNotFoundException:

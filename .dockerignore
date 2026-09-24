@@ -11,6 +11,10 @@ data/raw/generated
 # The external dataset cache is 44 MB and downloads on demand.
 data/raw/external
 
+# The pipeline's lake: a 96 MB raw CSV and Spark's output. The pipeline
+# service mounts ./data instead, and baking it in copied it into every image.
+data/lake
+
 # Build outputs, not inputs.
 reports
 **/*.xlsx
