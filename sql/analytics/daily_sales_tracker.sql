@@ -32,7 +32,7 @@ SELECT
     d.date,
     d.net_sales,
     d.units,
-    do.orders,
+    od.orders,
     CASE WHEN d.ordered_units <> 0
          THEN ROUND(CAST(d.fulfilled_units AS REAL) / d.ordered_units, 4) END AS fill_rate,
     p.sales_target,
@@ -42,6 +42,6 @@ SELECT
     LAG(d.net_sales) OVER (ORDER BY d.date)                                   AS prior_day_net_sales,
     ROUND(d.net_sales - LAG(d.net_sales) OVER (ORDER BY d.date), 2)           AS day_over_day_change
 FROM daily AS d
-JOIN daily_orders AS do ON do.date = d.date
+JOIN daily_orders AS od ON od.date = d.date
 LEFT JOIN plan AS p ON p.date = d.date
 ORDER BY d.date;

@@ -24,3 +24,38 @@ services:
     image: rootsignal
     profiles: ["tools"]
     command: pytest
+
+  # Source to warehouse: land the published data, conform it in Spark, load
+  # it into the warehouse below. The lake is ./data/lake on the host.
+  pipeline:
+    build: .
+    image: rootsignal
+    profiles: ["tools"]
+    depends_on:
+      warehouse:
+        condition: service_healthy
+    environment:
+      - ROOTSIGNAL_WAREHOUSE_URL=postgresql://rootsignal:rootsignal@warehouse:5432/rootsignal
+    volumes:
+      - ./data:/app/data
+    command: python scripts/run_pipeline.py
+
+  # The warehouse the pipeline loads into. Credentials are for a local
+  # container only; a deployed warehouse takes its URL from the environment.
+  warehouse:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=rootsignal
+      - POSTGRES_PASSWORD=rootsignal
+      - POSTGRES_DB=rootsignal
+    ports:
+      - "5433:5432"
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rootsignal"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  warehouse-data:

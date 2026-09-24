@@ -38,4 +38,7 @@ LEFT JOIN actual AS a
        ON a.region_code = p.region_code
       AND a.category = p.category
       AND a.channel = p.channel
-ORDER BY variance_pct;
+-- Ties are broken on the segment key, and NULLs placed explicitly: SQLite
+-- sorts them first and PostgreSQL last, so leaving either implicit gives the
+-- two engines different row orders for the same result.
+ORDER BY variance_pct NULLS FIRST, p.region_code, p.category, p.channel;

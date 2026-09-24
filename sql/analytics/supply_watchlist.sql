@@ -23,12 +23,14 @@ WITH weekly AS (
 stock AS (
     -- Stock is a level and is averaged; stockout_flag is a rate over SKU-days.
     -- Summing a level would report a week's stock as seven times its own size.
+    -- Both are cast before averaging: Redshift's AVG of an integer column is an
+    -- integer, which would report every stockout rate below 1 as 0.
     SELECT
-        DATE(i.date, 'weekday 0', '-6 days') AS week_start,
+        DATE(i.date, 'weekday 0', '-6 days')              AS week_start,
         i.region_code,
         i.category,
-        ROUND(AVG(i.available_stock), 2)     AS available_stock,
-        ROUND(AVG(i.stockout_flag), 4)       AS stockout_rate
+        ROUND(AVG(CAST(i.available_stock AS REAL)), 2)    AS available_stock,
+        ROUND(AVG(CAST(i.stockout_flag AS REAL)), 4)      AS stockout_rate
     FROM stg_inventory AS i
     GROUP BY week_start, i.region_code, i.category
 ),
@@ -51,15 +53,16 @@ joined AS (
           AND s.region_code = w.region_code
           AND s.category = w.category
 ),
+-- The window is written out on each LAG because Redshift has no named WINDOW
+-- clause.
 movement AS (
     SELECT
         *,
-        LAG(fill_rate)       OVER segment AS prior_fill_rate,
-        LAG(ordered_units)   OVER segment AS prior_ordered_units,
-        LAG(available_stock) OVER segment AS prior_available_stock,
-        LAG(stockout_rate)   OVER segment AS prior_stockout_rate
+        LAG(fill_rate)       OVER (PARTITION BY region_code, category ORDER BY week_start) AS prior_fill_rate,
+        LAG(ordered_units)   OVER (PARTITION BY region_code, category ORDER BY week_start) AS prior_ordered_units,
+        LAG(available_stock) OVER (PARTITION BY region_code, category ORDER BY week_start) AS prior_available_stock,
+        LAG(stockout_rate)   OVER (PARTITION BY region_code, category ORDER BY week_start) AS prior_stockout_rate
     FROM joined
-    WINDOW segment AS (PARTITION BY region_code, category ORDER BY week_start)
 )
 SELECT
     week_start,
@@ -82,4 +85,4 @@ WHERE prior_fill_rate IS NOT NULL
   AND fill_rate - prior_fill_rate <= -0.05
   -- ...while demand did not, so this is not simply a shrinking segment.
   AND CAST(ordered_units AS REAL) / prior_ordered_units >= 0.95
-ORDER BY fill_rate_change;
+ORDER BY fill_rate_change, week_start, region_code, category;

@@ -44,4 +44,7 @@ FROM dim_kam AS k
 LEFT JOIN sales  AS s ON s.kam_id = k.kam_id
 LEFT JOIN orders AS o ON o.kam_id = k.kam_id
 LEFT JOIN quota  AS q ON q.kam_id = k.kam_id
-ORDER BY sales_attainment;
+-- Ties are broken on the segment key, and NULLs placed explicitly: SQLite
+-- sorts them first and PostgreSQL last, so leaving either implicit gives the
+-- two engines different row orders for the same result.
+ORDER BY sales_attainment NULLS FIRST, k.kam_id;
