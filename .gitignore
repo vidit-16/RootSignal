@@ -40,3 +40,6 @@ mutants/
 .vscode/
 .idea/
 .DS_Store
+
+# The pipeline's local lake (rebuilt by scripts/run_pipeline.py)
+data/lake/

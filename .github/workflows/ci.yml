@@ -19,6 +19,26 @@ jobs:
         # the floor was the only version anyone had ever run.
         python-version: ["3.12", "3.13"]
 
+    # The warehouse tests compare every query on PostgreSQL with SQLite. Without
+    # a server they skip, so CI provides one rather than letting them pass by
+    # not running.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rootsignal
+          POSTGRES_PASSWORD: rootsignal
+          POSTGRES_DB: rootsignal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rootsignal"
+          --health-interval 5s
+          --health-retries 10
+
+    env:
+      ROOTSIGNAL_WAREHOUSE_URL: postgresql://rootsignal:rootsignal@localhost:5432/rootsignal
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -29,14 +49,21 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
+      # Spark runs on the JVM; the conform job's tests need one.
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install project and development dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev,pipeline]"
 
       - name: Generate controlled sample dataset
         run: python scripts/generate_sample_data.py --output-dir data/raw/generated
 
       - name: Run test suite
-        run: pytest
+        run: pytest -rs
 
       - name: Run Ruff checks
         run: ruff check .
